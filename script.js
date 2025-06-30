@@ -403,7 +403,7 @@ function getEmailConfig() {
 function handleCurriculumSubmit(e) {
     e.preventDefault();
     
-    console.log('📝 Iniciando envio do currículo (usando email da hospedagem)...');
+    console.log('📝 Iniciando envio do currículo (MODO API)...');
     
     const formData = new FormData(curriculumForm);
     const name = formData.get('name');
@@ -445,9 +445,9 @@ function handleCurriculumSubmit(e) {
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando currículo...';
     submitBtn.disabled = true;
     
-    console.log('🚀 Enviando dados para process-simple.php (email da hospedagem)...');
+    console.log('🚀 Enviando dados para process-simple.php...');
     
-    // Send to PHP (usando versão simplificada)
+    // Send to PHP
     fetch('process-simple.php', {
         method: 'POST',
         body: formData
@@ -489,19 +489,11 @@ function handleCurriculumSubmit(e) {
         }
     })
     .catch(error => {
-        console.error('💥 Erro crítico:', error);
+        console.error('💥 Erro crítico na requisição fetch:', error);
         
-        let errorMessage = 'Erro ao enviar currículo. ';
+        let errorMessage = 'Erro ao enviar currículo. Causa: ' + error.message;
         
-        if (error.message.includes('Failed to fetch')) {
-            errorMessage += 'Problema de conexão com o servidor.';
-        } else if (error.message.includes('HTTP')) {
-            errorMessage += 'Erro do servidor: ' + error.message;
-        } else {
-            errorMessage += error.message;
-        }
-        
-        alert('❌ ' + errorMessage + '\n\nTente novamente ou entre em contato pelo WhatsApp (61) 3359-7358.');
+        alert('❌ ' + errorMessage + '\n\nVerifique sua conexão com a internet ou entre em contato com o suporte.');
     })
     .finally(() => {
         // Reset button
@@ -532,5 +524,4 @@ document.addEventListener('input', function(e) {
 });
 
 // Debug: Log when script loads
-console.log('📜 Script carregado com sucesso (email da hospedagem)!');
-console.log('⚙️ Configurações de email disponíveis:', getEmailConfig());
+console.log('📜 Script.js carregado com sucesso (MODO API).');

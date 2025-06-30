@@ -54,7 +54,15 @@ function uploadFile($file, $allowedTypes, $prefix = '') {
 // --- FUNÇÕES DA API ---
 
 function sendApiTextMessage($token, $url, $number, $message) {
+    // Validação básica do número
+    if (strlen($number) < 12 || !str_starts_with($number, '55')) {
+        logError("API (Texto): Número de telefone inválido: $number");
+        return false;
+    }
+
     $data = ['number' => $number, 'body' => $message, 'saveOnTicket' => true];
+    logError("API (Texto): Preparando para enviar JSON: " . json_encode($data), 'INFO');
+
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -70,7 +78,16 @@ function sendApiTextMessage($token, $url, $number, $message) {
 }
 
 function sendApiMediaMessage($token, $url, $number, $filePath, $fileName) {
-    if (!file_exists($filePath)) return false;
+    // Validação básica do número
+    if (strlen($number) < 12 || !str_starts_with($number, '55')) {
+        logError("API (Media): Número de telefone inválido: $number");
+        return false;
+    }
+    if (!file_exists($filePath)) {
+        logError("API (Media): Arquivo não encontrado para envio: $filePath");
+        return false;
+    }
+
     $cFile = new CURLFile($filePath, mime_content_type($filePath), $fileName);
     $data = ['number' => $number, 'medias' => $cFile, 'saveOnTicket' => true];
     $ch = curl_init($url);
@@ -147,10 +164,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Enviar notificações via API
         if (!empty($config['api_token']) && !empty($config['notification_number'])) {
+            logError("Iniciando envio de notificação via API para {$config['notification_number']}", 'INFO');
             $textMessage = "*Novo Currículo Recebido* 📄\n\n*Nome:* {$formData['name']}\n*Telefone:* {$formData['phone']}\n*Cidade:* {$formData['city']}\n\n_Currículo e foto em anexo._";
-            sendApiTextMessage($config['api_token'], $config['api_url'], $config['notification_number'], $textMessage);
-            sendApiMediaMessage($config['api_token'], $config['api_url'], $config['notification_number'], 'uploads/' . $resumeFile, $resumeFile);
-            sendApiMediaMessage($config['api_token'], $config['api_url'], $config['notification_number'], 'uploads/' . $photoFile, $photoFile);
+            
+            $textSuccess = sendApiTextMessage($config['api_token'], $config['api_url'], $config['notification_number'], $textMessage);
+            if (!$textSuccess) {
+                throw new Exception("Falha ao enviar notificação de texto via API. Verifique os logs.");
+            }
+
+            $resumeSuccess = sendApiMediaMessage($config['api_token'], $config['api_url'], $config['notification_number'], 'uploads/' . $resumeFile, $resumeFile);
+             if (!$resumeSuccess) {
+                logError("Falha ao enviar o PDF do currículo via API. Continuando...", 'WARNING');
+            }
+
+            $photoSuccess = sendApiMediaMessage($config['api_token'], $config['api_url'], $config['notification_number'], 'uploads/' . $photoFile, $photoFile);
+            if (!$photoSuccess) {
+                logError("Falha ao enviar a foto via API. Continuando...", 'WARNING');
+            }
+        } else {
+            logError("API Token ou Número de Notificação não configurado. Notificação pulada.", 'WARNING');
         }
 
         echo json_encode(['success' => true, 'message' => 'Currículo cadastrado com sucesso!']);

@@ -1,13 +1,3 @@
-[2025-06-30 14:06:39] [INFO] [IP: ::1] Teste de API: Status 200, Resposta: {"mensagem":"Message added to queue"}
-[2025-06-30 14:08:01] [INFO] [IP: ::1] === INÍCIO DO PROCESSAMENTO (MODO API) ===
-[2025-06-30 14:08:01] [SUCCESS] [IP: ::1] Uploads concluídos: curriculo_6862c471ebf74.pdf, foto_6862c471ec889.png
-[2025-06-30 14:08:01] [SUCCESS] [IP: ::1] Dados salvos no log de currículos
-[2025-06-30 14:08:01] [INFO] [IP: ::1] Iniciando envio de notificação via API para 5585999999999
-[2025-06-30 14:08:02] [SUCCESS] [IP: ::1] API (Texto): Mensagem enviada com sucesso para 5585999999999.
-[2025-06-30 14:08:04] [SUCCESS] [IP: ::1] API (Media): Arquivo curriculo_6862c471ebf74.pdf enviado com sucesso para 5585999999999.
-[2025-06-30 14:08:05] [SUCCESS] [IP: ::1] API (Media): Arquivo foto_6862c471ec889.png enviado com sucesso para 5585999999999.
-[2025-06-30 14:08:05] [SUCCESS] [IP: ::1] Notificações da API enviadas.
-[2025-06-30 16:24:20] [INFO] [IP: ::1] Tentativa de atualização de credenciais. DADOS POST: {"email":"atendimentogor@gmail.com","password":"12345","action":"updateCredentials"} | SESSÃO: {"admin":true,"user_email":"atendimentogor@gmail.com"}
-[2025-06-30 16:24:39] [INFO] [IP: ::1] Tentativa de atualização de credenciais. DADOS POST: {"email":"atendimentogor@gmail.com","password":"12345","action":"updateCredentials"} | SESSÃO: {"admin":true,"user_id":1,"user_email":"rh@gorinformatica.com.br"}
-[2025-06-30 16:28:33] [INFO] [IP: ::1] Teste de API: Status 200, Resposta: {"mensagem":"Message added to queue"}
-[2025-06-30 16:38:27] [INFO] [IP: ::1] Teste de API: Status 200, Resposta: {"mensagem":"Message added to queue"}
+[2025-06-30 17:40:53] [ERROR] [IP: ::1] ERRO NO PROCESSAMENTO: Arquivo muito grande (Max 8MB)
+[2025-06-30 17:41:49] [INFO] [IP: ::1] Iniciando envio de notificação via API para 5561996104908
+[2025-06-30 17:41:49] [INFO] [IP: ::1] API (Texto): Preparando para enviar JSON: {"number":"5561996104908","body":"*Novo Curr\u00edculo Recebido* \ud83d\udcc4\n\n*Nome:* Gilson O Rocha\n*Telefone:* (61)98507-2648\n*Cidade:* Bras\u00edlia\n\n_Curr\u00edculo e foto em anexo._","saveOnTicket":true}
