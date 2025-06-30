@@ -159,6 +159,17 @@ if (isAdmin()) {
         exit;
     }
     
+    // API para limpar logs
+    if (isset($_POST['action']) && $_POST['action'] === 'clearLogs') {
+        header('Content-Type: application/json');
+        if (file_exists('error.log')) {
+            file_put_contents('error.log', '');
+            logError("Logs limpos pelo administrador", 'INFO');
+        }
+        echo json_encode(['success' => true]);
+        exit;
+    }
+    
     // API para carregar logs de erro
     if (isset($_GET['action']) && $_GET['action'] === 'getLogs') {
         header('Content-Type: application/json');
@@ -334,7 +345,20 @@ $totalCurriculos = $stmt->fetchColumn();
 
                 <!-- Tab Logs -->
                 <div id="logs-tab" class="tab-content">
-                    <!-- Conteúdo dos logs (sem alteração) -->
+                    <div class="form-section">
+                        <h3><i class="fas fa-file-alt"></i> Logs do Sistema</h3>
+                        <div style="margin-bottom: 15px;">
+                            <button onclick="loadLogs()" class="btn-secondary">
+                                <i class="fas fa-sync-alt"></i> Atualizar Logs
+                            </button>
+                            <button onclick="clearLogs()" class="btn-remove" style="background-color: #ef4444;">
+                                <i class="fas fa-trash"></i> Limpar Logs
+                            </button>
+                        </div>
+                        <div id="logsContainer" class="log-container">
+                            Carregando logs...
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -348,6 +372,10 @@ $totalCurriculos = $stmt->fetchColumn();
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById(tabName + '-tab').classList.add('active');
             event.currentTarget.classList.add('active');
+
+            if (tabName === 'logs') {
+                loadLogs();
+            }
         }
 
         // Carregar currículos via fetch
@@ -406,6 +434,45 @@ $totalCurriculos = $stmt->fetchColumn();
                     setTimeout(() => msgDiv.style.display = 'none', 3000);
                 });
         });
+
+        function loadLogs() {
+            const container = document.getElementById('logsContainer');
+            container.innerHTML = 'Carregando...';
+            fetch('admin.php?action=getLogs')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.logs.length > 0) {
+                        container.innerHTML = data.logs.map(log => {
+                            let className = 'log-line';
+                            if (log.includes('[ERROR]')) className += ' log-error';
+                            else if (log.includes('[SUCCESS]')) className += ' log-success';
+                            else if (log.includes('[WARNING]')) className += ' log-warning';
+                            else if (log.includes('[INFO]')) className += ' log-info';
+                            return `<div class="${className}">${log.replace(/</g, "<").replace(/>/g, ">")}</div>`;
+                        }).join('');
+                    } else {
+                        container.innerHTML = '<div class="log-line">Nenhum log encontrado.</div>';
+                    }
+                })
+                .catch(err => container.innerHTML = '<div class="log-line log-error">Erro ao carregar logs.</div>');
+        }
+
+        function clearLogs() {
+            if (!confirm('Tem certeza que deseja limpar todos os logs? Esta ação não pode ser desfeita.')) {
+                return;
+            }
+            const formData = new FormData();
+            formData.append('action', 'clearLogs');
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        loadLogs();
+                    } else {
+                        alert('Falha ao limpar os logs.');
+                    }
+                });
+        }
 
         // Teste da API
         document.getElementById('apiTestForm').addEventListener('submit', function(e) {
