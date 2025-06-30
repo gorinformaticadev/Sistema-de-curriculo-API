@@ -1,23 +1,14 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 
-// --- CONFIGURAÇÃO E FUNÇÕES GLOBAIS ---
+// Incluir o arquivo de conexão com o banco de dados
+require_once 'db_connect.php';
 
+// --- FUNÇÕES GLOBAIS ---
+
+ini_set('display_errors', 0);
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Erros não devem ser exibidos em produção
 
-// Carregar configuração
-function loadConfig() {
-    $configFile = 'config.json';
-    if (!file_exists($configFile)) {
-        throw new Exception("Arquivo de configuração não encontrado.");
-    }
-    return json_decode(file_get_contents($configFile), true);
-}
-
-$config = loadConfig();
-
-// Função para log de erros
 function logError($message, $type = 'ERROR') {
     $timestamp = date('Y-m-d H:i:s');
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
@@ -25,197 +16,149 @@ function logError($message, $type = 'ERROR') {
     file_put_contents('error.log', $logMessage, FILE_APPEND | LOCK_EX);
 }
 
+// Carregar configuração do banco de dados
+function loadConfigFromDB($pdo) {
+    $config = [];
+    $stmt = $pdo->query("SELECT chave, valor FROM config");
+    while ($row = $stmt->fetch()) {
+        $config[$row['chave']] = $row['valor'];
+    }
+    return $config;
+}
+
 // --- FUNÇÕES DE PROCESSAMENTO ---
 
-// Função para sanitizar dados
 function sanitizeInput($data) {
     return htmlspecialchars(strip_tags(trim($data)));
 }
 
-// Função para upload de arquivo
 function uploadFile($file, $allowedTypes, $prefix = '') {
     $uploadDir = 'uploads/';
-    $maxFileSize = 8 * 1024 * 1024; // 8MB
+    $maxFileSize = 8 * 1024 * 1024;
 
-    if (!file_exists($uploadDir)) {
-        mkdir($uploadDir, 0777, true);
-    }
-
-    if ($file['error'] !== UPLOAD_ERR_OK) {
-        throw new Exception('Erro no upload do arquivo: ' . $file['error']);
-    }
+    if (!file_exists($uploadDir)) mkdir($uploadDir, 0777, true);
+    if ($file['error'] !== UPLOAD_ERR_OK) throw new Exception('Erro no upload: ' . $file['error']);
+    if ($file['size'] > $maxFileSize) throw new Exception('Arquivo muito grande (Max 8MB)');
     
-    if ($file['size'] > $maxFileSize) {
-        throw new Exception('Arquivo muito grande. Máximo 8MB');
-    }
-    
-    $fileInfo = pathinfo($file['name']);
-    $extension = strtolower($fileInfo['extension']);
-    
-    if (!in_array($extension, $allowedTypes)) {
-        throw new Exception('Tipo de arquivo não permitido: ' . $extension);
-    }
+    $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($extension, $allowedTypes)) throw new Exception('Tipo de arquivo não permitido: ' . $extension);
     
     $fileName = $prefix . '_' . uniqid() . '.' . $extension;
     $filePath = $uploadDir . $fileName;
     
-    if (!move_uploaded_file($file['tmp_name'], $filePath)) {
-        throw new Exception('Erro ao salvar arquivo no servidor');
-    }
+    if (!move_uploaded_file($file['tmp_name'], $filePath)) throw new Exception('Erro ao salvar arquivo');
     
     return $fileName;
 }
 
-// --- FUNÇÕES DA API WHAPICHAT ---
+// --- FUNÇÕES DA API ---
 
-// Função para enviar mensagem de texto via API
-function sendApiTextMessage($token, $number, $message) {
-    $url = 'https://app.whapichat.com.br:443/backend/api/messages/send';
+function sendApiTextMessage($token, $url, $number, $message) {
     $data = ['number' => $number, 'body' => $message, 'saveOnTicket' => true];
-    
     $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'Authorization: Bearer ' . $token
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode($data),
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $token]
     ]);
-    
     $response = curl_exec($ch);
     $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-
-    if ($httpcode !== 200) {
-        logError("API (Texto): Falha ao enviar. Status: $httpcode, Resposta: $response");
-    } else {
-        logError("API (Texto): Mensagem enviada com sucesso para $number.", 'SUCCESS');
-    }
+    if ($httpcode !== 200) logError("API (Texto): Falha. Status: $httpcode, Resposta: $response");
     return $httpcode === 200;
 }
 
-// Função para enviar arquivo via API
-function sendApiMediaMessage($token, $number, $filePath, $fileName) {
-    $url = 'https://app.whapichat.com.br:443/backend/api/messages/send';
-    
-    if (!file_exists($filePath) || !is_readable($filePath)) {
-        logError("API (Media): Arquivo não encontrado ou ilegível: $filePath");
-        return false;
-    }
-
+function sendApiMediaMessage($token, $url, $number, $filePath, $fileName) {
+    if (!file_exists($filePath)) return false;
     $cFile = new CURLFile($filePath, mime_content_type($filePath), $fileName);
-    $data = [
-        'number' => $number,
-        'medias' => $cFile,
-        'saveOnTicket' => true
-    ];
-
+    $data = ['number' => $number, 'medias' => $cFile, 'saveOnTicket' => true];
     $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: multipart/form-data',
-        'Authorization: Bearer ' . $token
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $data,
+        CURLOPT_HTTPHEADER => ['Content-Type: multipart/form-data', 'Authorization: Bearer ' . $token]
     ]);
-
     $response = curl_exec($ch);
     $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-
-    if ($httpcode !== 200) {
-        logError("API (Media): Falha ao enviar $fileName. Status: $httpcode, Resposta: $response");
-    } else {
-        logError("API (Media): Arquivo $fileName enviado com sucesso para $number.", 'SUCCESS');
-    }
+    if ($httpcode !== 200) logError("API (Media): Falha ao enviar $fileName. Status: $httpcode, Resposta: $response");
     return $httpcode === 200;
 }
 
-// --- PROCESSAMENTO PRINCIPAL DO FORMULÁRIO ---
+// --- PROCESSAMENTO PRINCIPAL ---
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        logError("=== INÍCIO DO PROCESSAMENTO (MODO API) ===", 'INFO');
-        
-        // Validar dados e arquivos (mesma lógica de antes)
-        $requiredFields = ['name', 'birthDate', 'maritalStatus', 'phone', 'address', 'city', 'state', 'education', 'isStudying', 'hasCourses', 'hasExperience', 'motivation'];
-        foreach ($requiredFields as $field) {
-            if (empty($_POST[$field])) {
-                throw new Exception("Campo obrigatório não preenchido: $field");
-            }
-        }
-        if (!isset($_FILES['resume']) || !isset($_FILES['photo'])) {
-            throw new Exception('Arquivos obrigatórios não enviados');
-        }
+        $config = loadConfigFromDB($pdo);
 
-        // Sanitizar dados
-        $data = [];
-        foreach ($_POST as $key => $value) {
-            if (!is_array($value)) {
-                $data[$key] = sanitizeInput($value);
-            }
+        // Sanitizar e coletar dados do POST
+        $formData = [];
+        $fields = ['name', 'birthDate', 'maritalStatus', 'phone', 'isWhatsapp', 'email', 'address', 'city', 'state', 'education', 'isStudying', 'studyPeriod', 'hasCourses', 'courses', 'hasExperience', 'motivation'];
+        foreach ($fields as $field) {
+            $formData[$field] = sanitizeInput($_POST[$field] ?? '');
         }
         
+        // Coletar experiências (simplificado)
+        $experiences = [];
+        for ($i = 1; $i <= 5; $i++) {
+            if (!empty($_POST["company$i"])) {
+                $experiences[] = [
+                    'company' => sanitizeInput($_POST["company$i"]),
+                    'position' => sanitizeInput($_POST["position$i"]),
+                    'duration' => sanitizeInput($_POST["duration$i"]),
+                ];
+            }
+        }
+        $formData['experiences'] = json_encode($experiences);
+
         // Upload dos arquivos
         $resumeFile = uploadFile($_FILES['resume'], ['pdf'], 'curriculo');
         $photoFile = uploadFile($_FILES['photo'], ['jpg', 'jpeg', 'png', 'gif'], 'foto');
-        logError("Uploads concluídos: $resumeFile, $photoFile", 'SUCCESS');
 
-        // Salvar dados no log local
-        $logData = [
-            'timestamp' => date('Y-m-d H:i:s'),
-            'ip' => $_SERVER['REMOTE_ADDR'],
-            'data' => $data,
-            'files' => ['resume' => $resumeFile, 'photo' => $photoFile]
-        ];
-        file_put_contents('curriculos.log', json_encode($logData) . "\n", FILE_APPEND | LOCK_EX);
-        logError("Dados salvos no log de currículos", 'SUCCESS');
+        // Inserir no banco de dados
+        $sql = "INSERT INTO curriculos (nome, data_nascimento, estado_civil, telefone, is_whatsapp, email, endereco, cidade, estado, escolaridade, estudando, periodo_estudo, possui_cursos, cursos, possui_experiencia, experiencias, motivacao, arquivo_curriculo, arquivo_foto, ip_cadastro) 
+                VALUES (:nome, :data_nascimento, :estado_civil, :telefone, :is_whatsapp, :email, :endereco, :cidade, :estado, :escolaridade, :estudando, :periodo_estudo, :possui_cursos, :cursos, :possui_experiencia, :experiencias, :motivacao, :arquivo_curriculo, :arquivo_foto, :ip_cadastro)";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            ':nome' => $formData['name'],
+            ':data_nascimento' => $formData['birthDate'],
+            ':estado_civil' => $formData['maritalStatus'],
+            ':telefone' => $formData['phone'],
+            ':is_whatsapp' => $formData['isWhatsapp'],
+            ':email' => $formData['email'],
+            ':endereco' => $formData['address'],
+            ':cidade' => $formData['city'],
+            ':estado' => $formData['state'],
+            ':escolaridade' => $formData['education'],
+            ':estudando' => $formData['isStudying'],
+            ':periodo_estudo' => $formData['studyPeriod'],
+            ':possui_cursos' => $formData['hasCourses'],
+            ':cursos' => $formData['courses'],
+            ':possui_experiencia' => $formData['hasExperience'],
+            ':experiencias' => $formData['experiences'],
+            ':motivacao' => $formData['motivation'],
+            ':arquivo_curriculo' => $resumeFile,
+            ':arquivo_foto' => $photoFile,
+            ':ip_cadastro' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+        ]);
 
         // Enviar notificações via API
-        $apiToken = $config['apiToken'];
-        $notificationNumber = $config['notificationNumber'];
-
-        if (!empty($apiToken) && !empty($notificationNumber)) {
-            logError("Iniciando envio de notificação via API para $notificationNumber", 'INFO');
-
-            // 1. Enviar mensagem de texto com os dados
-            $textMessage = "
-*Novo Currículo Recebido* 📄
-
-*Nome:* {$data['name']}
-*Telefone:* {$data['phone']}
-*Email:* " . ($data['email'] ?? 'N/A') . "
-*Cidade:* {$data['city']}
-*Motivação:* {$data['motivation']}
-
-_Os arquivos (currículo e foto) serão enviados em seguida._
-            ";
-            sendApiTextMessage($apiToken, $notificationNumber, trim($textMessage));
-
-            // 2. Enviar arquivo do currículo
-            sendApiMediaMessage($apiToken, $notificationNumber, 'uploads/' . $resumeFile, $resumeFile);
-
-            // 3. Enviar arquivo da foto
-            sendApiMediaMessage($apiToken, $notificationNumber, 'uploads/' . $photoFile, $photoFile);
-
-            logError("Notificações da API enviadas.", 'SUCCESS');
-        } else {
-            logError("API Token ou Número de Notificação não configurado. Notificação não enviada.", 'WARNING');
+        if (!empty($config['api_token']) && !empty($config['notification_number'])) {
+            $textMessage = "*Novo Currículo Recebido* 📄\n\n*Nome:* {$formData['name']}\n*Telefone:* {$formData['phone']}\n*Cidade:* {$formData['city']}\n\n_Currículo e foto em anexo._";
+            sendApiTextMessage($config['api_token'], $config['api_url'], $config['notification_number'], $textMessage);
+            sendApiMediaMessage($config['api_token'], $config['api_url'], $config['notification_number'], 'uploads/' . $resumeFile, $resumeFile);
+            sendApiMediaMessage($config['api_token'], $config['api_url'], $config['notification_number'], 'uploads/' . $photoFile, $photoFile);
         }
 
-        // Resposta de sucesso para o frontend
-        echo json_encode([
-            'success' => true,
-            'message' => 'Currículo cadastrado com sucesso!'
-        ]);
+        echo json_encode(['success' => true, 'message' => 'Currículo cadastrado com sucesso!']);
 
     } catch (Exception $e) {
         logError("ERRO NO PROCESSAMENTO: " . $e->getMessage());
         http_response_code(400);
-        echo json_encode([
-            'success' => false,
-            'message' => $e->getMessage()
-        ]);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
 } else {
     http_response_code(405);
