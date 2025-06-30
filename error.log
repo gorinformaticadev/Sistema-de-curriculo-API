@@ -9,3 +9,4 @@
 [2025-06-30 14:08:05] [SUCCESS] [IP: ::1] Notificações da API enviadas.
 [2025-06-30 16:24:20] [INFO] [IP: ::1] Tentativa de atualização de credenciais. DADOS POST: {"email":"atendimentogor@gmail.com","password":"12345","action":"updateCredentials"} | SESSÃO: {"admin":true,"user_email":"atendimentogor@gmail.com"}
 [2025-06-30 16:24:39] [INFO] [IP: ::1] Tentativa de atualização de credenciais. DADOS POST: {"email":"atendimentogor@gmail.com","password":"12345","action":"updateCredentials"} | SESSÃO: {"admin":true,"user_id":1,"user_email":"rh@gorinformatica.com.br"}
+[2025-06-30 16:28:33] [INFO] [IP: ::1] Teste de API: Status 200, Resposta: {"mensagem":"Message added to queue"}

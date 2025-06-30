@@ -62,6 +62,41 @@ if (isset($_GET['logout'])) {
 
 // --- APIs INTERNAS (Ações do Painel) ---
 if (isAdmin()) {
+    // Teste de envio da API
+    if (isset($_POST['action']) && $_POST['action'] === 'testApiSend') {
+        header('Content-Type: application/json');
+        $number = $_POST['number'] ?? '';
+        $body = $_POST['body'] ?? '';
+        $token = $config['api_token'];
+        $url = $config['api_url'];
+
+        if (empty($token) || empty($url)) {
+            echo json_encode(['success' => false, 'message' => 'URL ou Token da API não configurados.']);
+            exit;
+        }
+
+        $data = ['number' => $number, 'body' => $body, 'saveOnTicket' => true];
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($data),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $token]
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        logError("Teste de API: Status $httpcode, Resposta: $response", 'INFO');
+
+        echo json_encode([
+            'success' => $httpcode === 200,
+            'message' => "Status: $httpcode\nResposta: " . htmlspecialchars($response)
+        ]);
+        exit;
+    }
+
     // Salvar configurações gerais
     if (isset($_POST['action']) && $_POST['action'] === 'saveApiConfig') {
         header('Content-Type: application/json');
@@ -219,6 +254,7 @@ $totalCurriculos = $stmt->fetchColumn();
                 <div class="tabs">
                     <button class="tab active" onclick="showTab('curriculos')"><i class="fas fa-list"></i> Currículos</button>
                     <button class="tab" onclick="showTab('config')"><i class="fas fa-cog"></i> Configurações</button>
+                    <button class="tab" onclick="showTab('tests')"><i class="fas fa-vial"></i> Testes da API</button>
                     <button class="tab" onclick="showTab('logs')"><i class="fas fa-file-alt"></i> Logs do Sistema</button>
                 </div>
 
@@ -272,6 +308,27 @@ $totalCurriculos = $stmt->fetchColumn();
                         </div>
                         <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Atualizar Credenciais</button>
                         <div id="configCredentialsSuccess" class="success-message" style="display: none;"></div>
+                    </form>
+                </div>
+
+                <!-- Tab Testes -->
+                <div id="tests-tab" class="tab-content">
+                    <div class="config-note">
+                        <h4><i class="fas fa-vial"></i> Testar Envio de Mensagem</h4>
+                        <p>Use esta ferramenta para verificar se suas configurações da API estão corretas, enviando uma mensagem de teste.</p>
+                    </div>
+                    <form id="apiTestForm" class="config-form">
+                        <h3>Teste de Mensagem de Texto</h3>
+                        <div class="form-group">
+                            <label>Número de Destino (com código do país)</label>
+                            <input type="text" id="testNumber" name="number" placeholder="5585999999999" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Mensagem</label>
+                            <textarea id="testBody" name="body" rows="3" required>Olá! Isto é uma mensagem de teste do sistema de currículos.</textarea>
+                        </div>
+                        <button type="submit" class="btn-primary"><i class="fas fa-paper-plane"></i> Enviar Mensagem de Teste</button>
+                        <div id="testResult" class="success-message" style="display: none; margin-top: 15px; white-space: pre-wrap; text-align: left;"></div>
                     </form>
                 </div>
 
@@ -347,6 +404,26 @@ $totalCurriculos = $stmt->fetchColumn();
                     msgDiv.textContent = data.message;
                     msgDiv.style.display = 'block';
                     setTimeout(() => msgDiv.style.display = 'none', 3000);
+                });
+        });
+
+        // Teste da API
+        document.getElementById('apiTestForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Enviando...';
+
+            const formData = new FormData(this);
+            formData.append('action', 'testApiSend');
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    resultDiv.textContent = data.message;
+                })
+                .catch(err => {
+                    resultDiv.textContent = 'Erro na requisição: ' + err;
                 });
         });
 
