@@ -165,9 +165,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Enviar notificações via API
         if (!empty($config['api_token']) && !empty($config['notification_number'])) {
             logError("Iniciando envio de notificação via API para {$config['notification_number']}", 'INFO');
-            $textMessage = "*Novo Currículo Recebido* 📄\n\n*Nome:* {$formData['name']}\n*Telefone:* {$formData['phone']}\n*Cidade:* {$formData['city']}\n\n_Currículo e foto em anexo._";
             
-            $textSuccess = sendApiTextMessage($config['api_token'], $config['api_url'], $config['notification_number'], $textMessage);
+            // Montar a mensagem completa com todos os campos
+            $textMessage = "*Novo Currículo Recebido* 📄\n\n";
+            $textMessage .= "*--- Dados Pessoais ---*\n";
+            $textMessage .= "*Nome:* " . ($formData['name'] ?? 'N/A') . "\n";
+            $textMessage .= "*Data de Nasc.:* " . ($formData['birthDate'] ? date('d/m/Y', strtotime($formData['birthDate'])) : 'N/A') . "\n";
+            $textMessage .= "*Estado Civil:* " . ($formData['maritalStatus'] ?? 'N/A') . "\n\n";
+
+            $textMessage .= "*--- Contato ---*\n";
+            $textMessage .= "*Telefone:* " . ($formData['phone'] ?? 'N/A') . "\n";
+            $textMessage .= "*É WhatsApp?:* " . ($formData['isWhatsapp'] ?? 'N/A') . "\n";
+            $textMessage .= "*Email:* " . ($formData['email'] ?? 'N/A') . "\n\n";
+
+            $textMessage .= "*--- Endereço ---*\n";
+            $textMessage .= "*Endereço:* " . ($formData['address'] ?? 'N/A') . "\n";
+            $textMessage .= "*Cidade:* " . ($formData['city'] ?? 'N/A') . "\n";
+            $textMessage .= "*Estado:* " . ($formData['state'] ?? 'N/A') . "\n\n";
+
+            $textMessage .= "*--- Formação ---*\n";
+            $textMessage .= "*Escolaridade:* " . ($formData['education'] ?? 'N/A') . "\n";
+            $textMessage .= "*Está Estudando?:* " . ($formData['isStudying'] ?? 'N/A') . "\n";
+            if (!empty($formData['studyPeriod'])) {
+                $textMessage .= "*Período de Estudo:* " . $formData['studyPeriod'] . "\n";
+            }
+            $textMessage .= "*Possui Cursos?:* " . ($formData['hasCourses'] ?? 'N/A') . "\n";
+            if (!empty($formData['courses'])) {
+                $textMessage .= "*Cursos:* " . $formData['courses'] . "\n";
+            }
+            $textMessage .= "\n";
+
+            $textMessage .= "*--- Experiência Profissional ---*\n";
+            $textMessage .= "*Possui Experiência?:* " . ($formData['hasExperience'] ?? 'N/A') . "\n";
+            $experiences = json_decode($formData['experiences'], true);
+            if (!empty($experiences)) {
+                foreach ($experiences as $i => $exp) {
+                    $textMessage .= "*Empresa " . ($i + 1) . ":* " . ($exp['company'] ?? 'N/A') . "\n";
+                    $textMessage .= "*Cargo " . ($i + 1) . ":* " . ($exp['position'] ?? 'N/A') . "\n";
+                    $textMessage .= "*Duração " . ($i + 1) . ":* " . ($exp['duration'] ?? 'N/A') . "\n";
+                }
+            }
+            $textMessage .= "\n";
+
+            $textMessage .= "*--- Objetivo ---*\n";
+            $textMessage .= "*Motivação:* " . ($formData['motivation'] ?? 'N/A') . "\n\n";
+
+            $textMessage .= "_Os arquivos (currículo e foto) serão enviados em seguida._";
+
+            $textSuccess = sendApiTextMessage($config['api_token'], $config['api_url'], $config['notification_number'], trim($textMessage));
             if (!$textSuccess) {
                 throw new Exception("Falha ao enviar notificação de texto via API. Verifique os logs.");
             }
