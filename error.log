@@ -1,0 +1,9 @@
+[2025-06-30 14:06:39] [INFO] [IP: ::1] Teste de API: Status 200, Resposta: {"mensagem":"Message added to queue"}
+[2025-06-30 14:08:01] [INFO] [IP: ::1] === INÍCIO DO PROCESSAMENTO (MODO API) ===
+[2025-06-30 14:08:01] [SUCCESS] [IP: ::1] Uploads concluídos: curriculo_6862c471ebf74.pdf, foto_6862c471ec889.png
+[2025-06-30 14:08:01] [SUCCESS] [IP: ::1] Dados salvos no log de currículos
+[2025-06-30 14:08:01] [INFO] [IP: ::1] Iniciando envio de notificação via API para 5585999999999
+[2025-06-30 14:08:02] [SUCCESS] [IP: ::1] API (Texto): Mensagem enviada com sucesso para 5585999999999.
+[2025-06-30 14:08:04] [SUCCESS] [IP: ::1] API (Media): Arquivo curriculo_6862c471ebf74.pdf enviado com sucesso para 5585999999999.
+[2025-06-30 14:08:05] [SUCCESS] [IP: ::1] API (Media): Arquivo foto_6862c471ec889.png enviado com sucesso para 5585999999999.
+[2025-06-30 14:08:05] [SUCCESS] [IP: ::1] Notificações da API enviadas.
