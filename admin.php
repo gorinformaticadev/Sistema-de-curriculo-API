@@ -839,6 +839,8 @@ $totalCurriculos = $stmt->fetchColumn();
                             <p><strong>Telefone:</strong> ${c.telefone}</p>
                             <p><strong>É WhatsApp?:</strong> ${c.is_whatsapp}</p>
                             <p><strong>Email:</strong> ${c.email || 'Não informado'}</p>
+                            <p><strong>Facebook:</strong> ${c.facebook || 'Não informado'}</p>
+                            <p><strong>Instagram:</strong> ${c.instagram || 'Não informado'}</p>
 
                             <h3><i class="fas fa-map-marker-alt"></i> Endereço</h3>
                             <p><strong>Endereço:</strong> ${c.endereco}</p>
