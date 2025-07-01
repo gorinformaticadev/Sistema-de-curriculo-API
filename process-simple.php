@@ -113,20 +113,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Sanitizar e coletar dados do POST
         $formData = [];
-        $fields = ['name', 'birthDate', 'maritalStatus', 'phone', 'isWhatsapp', 'email', 'address', 'city', 'state', 'education', 'isStudying', 'studyPeriod', 'hasCourses', 'courses', 'hasExperience', 'motivation'];
+        $fields = ['name', 'birthDate', 'maritalStatus', 'email', 'address', 'city', 'state', 'education', 'isStudying', 'studyPeriod', 'hasCourses', 'courses', 'hasExperience', 'motivation', 'acceptTerms', 'workSchedule'];
         foreach ($fields as $field) {
             $formData[$field] = sanitizeInput($_POST[$field] ?? '');
         }
         
+        // Coletar até 3 telefones e flags WhatsApp
+        $phones = [];
+        $whatsapps = [];
+
+        // Primeiro telefone sem número no nome do campo
+        if (!empty($_POST['phone'])) {
+            $phones[] = sanitizeInput($_POST['phone']);
+            $whatsapps[] = (isset($_POST['isWhatsapp']) && $_POST['isWhatsapp'] === 'Sim') ? 'Sim' : 'Não';
+        }
+
+        // Demais telefones com sufixo numérico
+        for ($i = 2; $i <= 3; $i++) {
+            $phoneKey = "phone$i";
+            $whatsappKey = "isWhatsapp$i";
+            if (!empty($_POST[$phoneKey])) {
+                $phones[] = sanitizeInput($_POST[$phoneKey]);
+                $whatsapps[] = (isset($_POST[$whatsappKey]) && $_POST[$whatsappKey] === 'Sim') ? 'Sim' : 'Não';
+            }
+        }
+        $formData['phone'] = implode(', ', $phones);
+        $formData['isWhatsapp'] = implode(', ', $whatsapps);
+        
         // Converter valores de texto para booleano (1/0) para o banco de dados, mantendo os textos originais para a notificação.
-        $isWhatsapp_db = ($formData['isWhatsapp'] === 'Sim') ? 1 : 0;
+        // Para o banco, salvar 1 se algum dos números for WhatsApp, 0 caso contrário
+        $isWhatsapp_db = in_array('Sim', $whatsapps) ? 1 : 0;
         $isStudying_db = ($formData['isStudying'] === 'Sim, estou!') ? 1 : 0;
         $hasCourses_db = ($formData['hasCourses'] === 'Sim') ? 1 : 0;
         $hasExperience_db = ($formData['hasExperience'] === 'Sim') ? 1 : 0;
 
         // Coletar experiências (simplificado)
         $experiences = [];
-        for ($i = 1; $i <= 5; $i++) {
+        for ($i = 1; $i <= 3; $i++) {
             if (!empty($_POST["company$i"])) {
                 $experiences[] = [
                     'company' => sanitizeInput($_POST["company$i"]),
@@ -150,7 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':nome' => $formData['name'],
             ':data_nascimento' => $formData['birthDate'],
             ':estado_civil' => $formData['maritalStatus'],
-            ':telefone' => $formData['phone'],
+            ':telefone' => $formData['phone'], // concatenated phones
             ':is_whatsapp' => $isWhatsapp_db,
             ':email' => $formData['email'],
             ':endereco' => $formData['address'],
@@ -181,8 +204,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $textMessage .= "*Estado Civil:* " . ($formData['maritalStatus'] ?? 'N/A') . "\n\n";
 
             $textMessage .= "*--- Contato ---*\n";
-            $textMessage .= "*Telefone:* " . ($formData['phone'] ?? 'N/A') . "\n";
-            $textMessage .= "*É WhatsApp?:* " . ($formData['isWhatsapp'] ?? 'N/A') . "\n";
+            foreach ($phones as $index => $phone) {
+                $waStatus = $whatsapps[$index] ?? 'Não';
+                $textMessage .= "*Telefone " . ($index + 1) . ":* $phone\n";
+                $textMessage .= "*É WhatsApp?:* $waStatus\n";
+            }
             $textMessage .= "*Email:* " . ($formData['email'] ?? 'N/A') . "\n\n";
 
             $textMessage .= "*--- Endereço ---*\n";
@@ -217,7 +243,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $textMessage .= "*--- Objetivo ---*\n";
             $textMessage .= "*Motivação:* " . ($formData['motivation'] ?? 'N/A') . "\n\n";
 
+            $textMessage .= "*--- Termos e Condições ---*\n";
+            $textMessage .= "*Aceita os termos?:* " . ($formData['acceptTerms'] ?? 'N/A') . "\n";
+            $textMessage .= "*Horário da vaga:* " . ($formData['workSchedule'] ?? 'N/A') . "\n\n";
+
             $textMessage .= "_Os arquivos (currículo e foto) serão enviados em seguida._";
+
 
             $textSuccess = sendApiTextMessage($config['api_token'], $config['api_url'], $config['notification_number'], trim($textMessage));
             if (!$textSuccess) {

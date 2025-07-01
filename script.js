@@ -35,6 +35,10 @@ function initializeEventListeners() {
 
 // Add Contact
 function addContact() {
+    if (contactCount >= 3) {
+        alert('Você pode adicionar no máximo 3 números de telefone.');
+        return;
+    }
     contactCount++;
     const container = document.getElementById('contactsContainer');
     
@@ -88,6 +92,10 @@ function removeContact(contactId) {
 
 // Add Experience
 function addExperience() {
+    if (experienceCount >= 3) {
+        alert('Você pode adicionar no máximo 3 empresas.');
+        return;
+    }
     experienceCount++;
     const container = document.getElementById('experiencesContainer');
     
