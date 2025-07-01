@@ -391,14 +391,6 @@ function resetFormSections() {
     });
 }
 
-// Get Email Configuration from localStorage or defaults
-function getEmailConfig() {
-    return {
-        emailUser: localStorage.getItem('emailUser') || 'noreply@gorinformatica.com.br',
-        recipientEmail: localStorage.getItem('recipientEmail') || 'rh@gorinformatica.com.br,lojagor@gmail.com'
-    };
-}
-
 // Handle Curriculum Form Submission
 function handleCurriculumSubmit(e) {
     e.preventDefault();
@@ -425,18 +417,6 @@ function handleCurriculumSubmit(e) {
     console.log('📎 Arquivos verificados:', {
         curriculo: resumeFile.name + ' (' + (resumeFile.size / 1024).toFixed(1) + 'KB)',
         foto: photoFile.name + ' (' + (photoFile.size / 1024).toFixed(1) + 'KB)'
-    });
-    
-    // Obter configurações de email
-    const emailConfig = getEmailConfig();
-    console.log('📧 Configurações de email (hospedagem):', {
-        user: emailConfig.emailUser,
-        recipients: emailConfig.recipientEmail
-    });
-    
-    // Adicionar configurações de email ao FormData
-    Object.keys(emailConfig).forEach(key => {
-        formData.append(key, emailConfig[key]);
     });
     
     // Show loading
@@ -482,7 +462,7 @@ function handleCurriculumSubmit(e) {
             document.getElementById('mainForm').style.display = 'none';
             document.getElementById('successMessage').style.display = 'flex';
             
-            console.log('🎉 Currículo enviado com sucesso (email da hospedagem)!');
+            console.log('🎉 Currículo enviado com sucesso!');
         } else {
             console.error('❌ Erro retornado pelo servidor:', data.message);
             alert('❌ Erro ao enviar currículo: ' + data.message);

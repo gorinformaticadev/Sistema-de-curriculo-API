@@ -34,7 +34,8 @@ function sanitizeInput($data) {
 
 function uploadFile($file, $allowedTypes, $prefix = '') {
     $uploadDir = 'uploads/';
-    $maxFileSize = 8 * 1024 * 1024;
+    $maxFileSize = 15 * 1024 * 1024;
+
 
     if (!file_exists($uploadDir)) mkdir($uploadDir, 0777, true);
     if ($file['error'] !== UPLOAD_ERR_OK) throw new Exception('Erro no upload: ' . $file['error']);
