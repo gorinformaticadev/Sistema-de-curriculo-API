@@ -56,6 +56,8 @@ try {
         `telefone` VARCHAR(20),
         `is_whatsapp` TINYINT(1) DEFAULT 0,
         `email` VARCHAR(255),
+        `facebook` VARCHAR(255),
+        `instagram` VARCHAR(255),
         `endereco` TEXT,
         `cidade` VARCHAR(255),
         `estado` VARCHAR(255),
@@ -75,6 +77,17 @@ try {
     ";
     $pdo->exec($sql_curriculos);
     echo "Tabela 'curriculos' verificada/criada com sucesso.\n";
+
+    // Adicionar colunas facebook e instagram se não existirem
+    $columns = $pdo->query("SHOW COLUMNS FROM curriculos")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('facebook', $columns)) {
+        $pdo->exec("ALTER TABLE curriculos ADD COLUMN facebook VARCHAR(255) AFTER email");
+        echo "Coluna 'facebook' adicionada com sucesso.\n";
+    }
+    if (!in_array('instagram', $columns)) {
+        $pdo->exec("ALTER TABLE curriculos ADD COLUMN instagram VARCHAR(255) AFTER facebook");
+        echo "Coluna 'instagram' adicionada com sucesso.\n";
+    }
 
     // 6. Inserir dados iniciais (usuário e configurações)
     

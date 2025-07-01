@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Sanitizar e coletar dados do POST
         $formData = [];
-        $fields = ['name', 'birthDate', 'maritalStatus', 'email', 'address', 'city', 'state', 'education', 'isStudying', 'studyPeriod', 'hasCourses', 'courses', 'hasExperience', 'motivation', 'acceptTerms', 'workSchedule'];
+        $fields = ['name', 'birthDate', 'maritalStatus', 'email', 'facebook', 'instagram', 'address', 'city', 'state', 'education', 'isStudying', 'studyPeriod', 'hasCourses', 'courses', 'hasExperience', 'motivation', 'acceptTerms', 'workSchedule'];
         foreach ($fields as $field) {
             $formData[$field] = sanitizeInput($_POST[$field] ?? '');
         }
@@ -165,8 +165,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $photoFile = uploadFile($_FILES['photo'], ['jpg', 'jpeg', 'png', 'gif'], 'foto');
 
         // Inserir no banco de dados
-        $sql = "INSERT INTO curriculos (nome, data_nascimento, estado_civil, telefone, is_whatsapp, email, endereco, cidade, estado, escolaridade, estudando, periodo_estudo, possui_cursos, cursos, possui_experiencia, experiencias, motivacao, arquivo_curriculo, arquivo_foto, ip_cadastro) 
-                VALUES (:nome, :data_nascimento, :estado_civil, :telefone, :is_whatsapp, :email, :endereco, :cidade, :estado, :escolaridade, :estudando, :periodo_estudo, :possui_cursos, :cursos, :possui_experiencia, :experiencias, :motivacao, :arquivo_curriculo, :arquivo_foto, :ip_cadastro)";
+        $sql = "INSERT INTO curriculos (nome, data_nascimento, estado_civil, telefone, is_whatsapp, email, facebook, instagram, endereco, cidade, estado, escolaridade, estudando, periodo_estudo, possui_cursos, cursos, possui_experiencia, experiencias, motivacao, arquivo_curriculo, arquivo_foto, ip_cadastro) 
+                VALUES (:nome, :data_nascimento, :estado_civil, :telefone, :is_whatsapp, :email, :facebook, :instagram, :endereco, :cidade, :estado, :escolaridade, :estudando, :periodo_estudo, :possui_cursos, :cursos, :possui_experiencia, :experiencias, :motivacao, :arquivo_curriculo, :arquivo_foto, :ip_cadastro)";
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
@@ -176,6 +176,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':telefone' => $formData['phone'], // concatenated phones
             ':is_whatsapp' => $isWhatsapp_db,
             ':email' => $formData['email'],
+            ':facebook' => $formData['facebook'],
+            ':instagram' => $formData['instagram'],
             ':endereco' => $formData['address'],
             ':cidade' => $formData['city'],
             ':estado' => $formData['state'],
@@ -246,6 +248,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $textMessage .= "*--- Termos e Condições ---*\n";
             $textMessage .= "*Aceita os termos?:* " . ($formData['acceptTerms'] ?? 'N/A') . "\n";
             $textMessage .= "*Horário da vaga:* " . ($formData['workSchedule'] ?? 'N/A') . "\n\n";
+
+            $textMessage .= "*--- Redes Sociais ---*\n";
+            $textMessage .= "*Facebook:* " . ($formData['facebook'] ?? 'N/A') . "\n";
+            $textMessage .= "*Instagram:* " . ($formData['instagram'] ?? 'N/A') . "\n\n";
 
             $textMessage .= "_Os arquivos (currículo e foto) serão enviados em seguida._";
 
