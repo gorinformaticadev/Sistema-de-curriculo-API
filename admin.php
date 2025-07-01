@@ -240,6 +240,58 @@ if (isAdmin()) {
         }
         exit;
     }
+
+    // API para deletar um currículo
+    if (isset($_POST['action']) && $_POST['action'] === 'deleteCurriculo') {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'ID inválido.']);
+            exit;
+        }
+
+        try {
+            $pdo->beginTransaction();
+
+            // 1. Buscar os nomes dos arquivos antes de deletar o registro
+            $stmt = $pdo->prepare("SELECT arquivo_curriculo, arquivo_foto FROM curriculos WHERE id = ?");
+            $stmt->execute([$id]);
+            $files = $stmt->fetch();
+
+            if (!$files) {
+                throw new Exception('Currículo não encontrado no banco de dados.');
+            }
+
+            // 2. Deletar o registro do banco de dados
+            $stmt = $pdo->prepare("DELETE FROM curriculos WHERE id = ?");
+            $stmt->execute([$id]);
+            
+            // 3. Deletar os arquivos físicos
+            $uploadDir = 'uploads/';
+            if (!empty($files['arquivo_curriculo']) && file_exists($uploadDir . $files['arquivo_curriculo'])) {
+                unlink($uploadDir . $files['arquivo_curriculo']);
+            }
+            if (!empty($files['arquivo_foto']) && file_exists($uploadDir . $files['arquivo_foto'])) {
+                unlink($uploadDir . $files['arquivo_foto']);
+            }
+            
+            $pdo->commit();
+            logError("Currículo ID: $id deletado com sucesso pelo administrador.", 'INFO');
+            echo json_encode(['success' => true, 'message' => 'Currículo deletado com sucesso.']);
+
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            logError("Falha ao deletar currículo ID: $id. Erro: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erro ao deletar o currículo: ' . $e->getMessage()]);
+        }
+        exit;
+    }
 }
 
 
@@ -303,6 +355,15 @@ $totalCurriculos = $stmt->fetchColumn();
         .tab-content.active { display: block; }
         .log-container { background: #1a1a1a; color: #00ff00; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.85rem; max-height: 400px; overflow-y: auto; }
         .config-note { background: #e0f2fe; border: 1px solid #0288d1; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+        .btn-remove {
+            background-color: #ef4444; /* red-500 */
+            color: white;
+        }
+        .btn-remove:hover {
+            background-color: #dc2626; /* red-600 */
+        }
+        .btn-small { margin-left: 5px; }
+
         
         /* Estilos do Modal */
         .modal {
@@ -585,7 +646,8 @@ $totalCurriculos = $stmt->fetchColumn();
                                 <td>${c.email || 'N/A'}</td>
                                 <td>${c.cidade}</td>
                                 <td>
-                                    <button class="btn-primary btn-small" onclick="viewCurriculo(${c.id})">Ver</button>
+                                    <button class="btn-primary btn-small" onclick="viewCurriculo(${c.id})"><i class="fas fa-eye"></i> Ver</button>
+                                    <button class="btn-remove btn-small" onclick="deleteCurriculo(${c.id}, this)"><i class="fas fa-trash"></i> Deletar</button>
                                 </td>
                             </tr>
                         `).join('');
@@ -812,6 +874,41 @@ $totalCurriculos = $stmt->fetchColumn();
                 .catch(err => {
                     modalBody.innerHTML = `<p class="error-message">Erro ao carregar os dados: ${err}</p>`;
                 });
+        }
+
+        function deleteCurriculo(id, element) {
+            if (!confirm('Tem certeza que deseja deletar este currículo?\n\nEsta ação também removerá os arquivos (PDF e foto) associados e não pode ser desfeita.')) {
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('action', 'deleteCurriculo');
+            formData.append('id', id);
+
+            // Pegar o token CSRF de um dos formulários existentes
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken);
+            }
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        // Remove a linha da tabela suavemente
+                        const row = element.closest('tr');
+                        row.style.transition = 'opacity 0.5s';
+                        row.style.opacity = '0';
+                        setTimeout(() => row.remove(), 500);
+
+                        // Atualiza o contador
+                        const countElement = document.querySelector('.stat-number');
+                        countElement.textContent = parseInt(countElement.textContent) - 1;
+                    } else {
+                        alert('Erro: ' + data.message);
+                    }
+                })
+                .catch(err => alert('Ocorreu um erro de comunicação com o servidor.'));
         }
 
         // Carregamento inicial
