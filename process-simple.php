@@ -39,7 +39,7 @@ function uploadFile($file, $allowedTypes, $prefix = '') {
 
     if (!file_exists($uploadDir)) mkdir($uploadDir, 0777, true);
     if ($file['error'] !== UPLOAD_ERR_OK) throw new Exception('Erro no upload: ' . $file['error']);
-    if ($file['size'] > $maxFileSize) throw new Exception('Arquivo muito grande (Max 8MB)');
+    if ($file['size'] > $maxFileSize) throw new Exception('Arquivo muito grande (Max 15MB)');
     
     $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     if (!in_array($extension, $allowedTypes)) throw new Exception('Tipo de arquivo não permitido: ' . $extension);
