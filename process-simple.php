@@ -117,6 +117,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $formData[$field] = sanitizeInput($_POST[$field] ?? '');
         }
         
+        // Converter valores de texto para booleano (1/0) para o banco de dados, mantendo os textos originais para a notificação.
+        $isWhatsapp_db = ($formData['isWhatsapp'] === 'Sim') ? 1 : 0;
+        $isStudying_db = ($formData['isStudying'] === 'Sim, estou!') ? 1 : 0;
+        $hasCourses_db = ($formData['hasCourses'] === 'Sim') ? 1 : 0;
+        $hasExperience_db = ($formData['hasExperience'] === 'Sim') ? 1 : 0;
+
         // Coletar experiências (simplificado)
         $experiences = [];
         for ($i = 1; $i <= 5; $i++) {
@@ -144,17 +150,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':data_nascimento' => $formData['birthDate'],
             ':estado_civil' => $formData['maritalStatus'],
             ':telefone' => $formData['phone'],
-            ':is_whatsapp' => $formData['isWhatsapp'],
+            ':is_whatsapp' => $isWhatsapp_db,
             ':email' => $formData['email'],
             ':endereco' => $formData['address'],
             ':cidade' => $formData['city'],
             ':estado' => $formData['state'],
             ':escolaridade' => $formData['education'],
-            ':estudando' => $formData['isStudying'],
+            ':estudando' => $isStudying_db,
             ':periodo_estudo' => $formData['studyPeriod'],
-            ':possui_cursos' => $formData['hasCourses'],
+            ':possui_cursos' => $hasCourses_db,
             ':cursos' => $formData['courses'],
-            ':possui_experiencia' => $formData['hasExperience'],
+            ':possui_experiencia' => $hasExperience_db,
             ':experiencias' => $formData['experiences'],
             ':motivacao' => $formData['motivation'],
             ':arquivo_curriculo' => $resumeFile,

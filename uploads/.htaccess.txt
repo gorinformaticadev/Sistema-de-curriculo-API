@@ -1,0 +1,6 @@
+# Impede a execução direta de scripts na pasta de uploads.
+
+# Para servidores Apache 2.4+
+<Files "*.*">
+  Require all denied
+</Files>

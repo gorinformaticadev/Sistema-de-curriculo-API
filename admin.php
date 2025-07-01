@@ -60,6 +60,12 @@ if (isset($_GET['logout'])) {
     exit;
 }
 
+// --- GERAÇÃO DE TOKEN CSRF ---
+if (isAdmin() && empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+
 // --- APIs INTERNAS (Ações do Painel) ---
 if (isAdmin()) {
     // Teste de envio da API
@@ -69,6 +75,11 @@ if (isAdmin()) {
         $body = $_POST['body'] ?? '';
         $token = $config['api_token'];
         $url = $config['api_url'];
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
 
         if (empty($token) || empty($url)) {
             echo json_encode(['success' => false, 'message' => 'URL ou Token da API não configurados.']);
@@ -100,6 +111,12 @@ if (isAdmin()) {
     // Salvar configurações gerais
     if (isset($_POST['action']) && $_POST['action'] === 'saveApiConfig') {
         header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
         $updated = 0;
         $params = ['api_url', 'api_token', 'notification_number'];
         $stmt = $pdo->prepare("UPDATE config SET valor = ? WHERE chave = ?");
@@ -116,6 +133,11 @@ if (isAdmin()) {
     // Atualizar credenciais do usuário
     if (isset($_POST['action']) && $_POST['action'] === 'updateCredentials') {
         header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
         
         // Log para depuração
         logError("Tentativa de atualização de credenciais. DADOS POST: " . json_encode($_POST) . " | SESSÃO: " . json_encode($_SESSION), 'INFO');
@@ -162,6 +184,12 @@ if (isAdmin()) {
     // API para limpar logs
     if (isset($_POST['action']) && $_POST['action'] === 'clearLogs') {
         header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
         if (file_exists('error.log')) {
             file_put_contents('error.log', '');
             logError("Logs limpos pelo administrador", 'INFO');
@@ -289,6 +317,7 @@ $totalCurriculos = $stmt->fetchColumn();
                     
                     <form id="apiConfigForm" class="config-form">
                         <h3>Configuração da API WhapiChat</h3>
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                         <div class="form-group">
                             <label>URL da API</label>
                             <input type="text" id="apiUrl" name="api_url" value="<?php echo htmlspecialchars($config['api_url']); ?>">
@@ -309,6 +338,7 @@ $totalCurriculos = $stmt->fetchColumn();
 
                     <form id="credentialsForm" class="config-form">
                         <h3>Credenciais de Acesso</h3>
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                         <div class="form-group">
                             <label>Email de Login</label>
                             <input type="email" id="adminEmail" name="email" value="<?php echo htmlspecialchars($_SESSION['user_email']); ?>" required>
@@ -330,6 +360,7 @@ $totalCurriculos = $stmt->fetchColumn();
                     </div>
                     <form id="apiTestForm" class="config-form">
                         <h3>Teste de Mensagem de Texto</h3>
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                         <div class="form-group">
                             <label>Número de Destino (com código do país)</label>
                             <input type="text" id="testNumber" name="number" placeholder="5585999999999" required>
@@ -408,6 +439,12 @@ $totalCurriculos = $stmt->fetchColumn();
             e.preventDefault();
             const formData = new FormData(this);
             formData.append('action', 'saveApiConfig');
+
+            // Adicionar o token CSRF ao FormData para o fetch
+            const csrfToken = document.querySelector('#apiConfigForm input[name="csrf_token"]').value;
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken);
+            }
             
             fetch('admin.php', { method: 'POST', body: formData })
                 .then(res => res.json())
@@ -424,6 +461,12 @@ $totalCurriculos = $stmt->fetchColumn();
             e.preventDefault();
             const formData = new FormData(this);
             formData.append('action', 'updateCredentials');
+
+            // Adicionar o token CSRF ao FormData para o fetch
+            const csrfToken = document.querySelector('#credentialsForm input[name="csrf_token"]').value;
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken);
+            }
 
             fetch('admin.php', { method: 'POST', body: formData })
                 .then(res => res.json())
@@ -463,6 +506,12 @@ $totalCurriculos = $stmt->fetchColumn();
             }
             const formData = new FormData();
             formData.append('action', 'clearLogs');
+
+            // Adicionar o token CSRF ao FormData para o fetch
+            const csrfToken = document.querySelector('#apiConfigForm input[name="csrf_token"]').value; // Pode pegar de qualquer form
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken);
+            }
             fetch('admin.php', { method: 'POST', body: formData })
                 .then(res => res.json())
                 .then(data => {
@@ -483,6 +532,12 @@ $totalCurriculos = $stmt->fetchColumn();
 
             const formData = new FormData(this);
             formData.append('action', 'testApiSend');
+
+            // Adicionar o token CSRF ao FormData para o fetch
+            const csrfToken = document.querySelector('#apiTestForm input[name="csrf_token"]').value;
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken);
+            }
 
             fetch('admin.php', { method: 'POST', body: formData })
                 .then(res => res.json())
