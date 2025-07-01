@@ -355,6 +355,60 @@ $totalCurriculos = $stmt->fetchColumn();
         .experience-block h4 {
             margin-top: 0;
         }
+
+        /* Estilos do Modal de Imagem (Lightbox) */
+        .modal-content-image {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 90vh;
+            animation: zoomIn 0.3s;
+        }
+        .image-modal-close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+        }
+        .image-modal-close:hover,
+        .image-modal-close:focus {
+            color: #bbb;
+        }
+
+        /* Estilos do Modal de PDF */
+        .modal-content-pdf {
+            background-color: #fefefe;
+            margin: 2% auto;
+            padding: 0;
+            border: 1px solid #888;
+            width: 90%;
+            height: 95vh;
+            max-width: 1000px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .pdf-modal-close {
+            position: absolute;
+            top: 5px;
+            right: 15px;
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 10; /* Para ficar sobre o iframe */
+        }
+        #pdf-viewer {
+            width: 100%;
+            height: 100%;
+            border-radius: 12px;
+        }
     </style>
 </head>
 <body>
@@ -488,6 +542,21 @@ $totalCurriculos = $stmt->fetchColumn();
             </div>
         </div>
     </div>
+
+    <!-- Modal para Visualizar Foto -->
+    <div id="imageModal" class="modal">
+        <span class="modal-close image-modal-close">&times;</span>
+        <img class="modal-content-image" id="modalImage">
+    </div>
+
+    <!-- Modal para Visualizar PDF -->
+    <div id="pdfModal" class="modal">
+        <div class="modal-content-pdf">
+            <span class="modal-close pdf-modal-close">&times;</span>
+            <iframe id="pdf-viewer" src="" frameborder="0"></iframe>
+        </div>
+    </div>
+
 
     <script>
         function showTab(tabName) {
@@ -645,17 +714,38 @@ $totalCurriculos = $stmt->fetchColumn();
         const modal = document.getElementById('curriculoModal');
         const modalBody = document.getElementById('modalBody');
         const closeModalBtn = document.querySelector('.modal-close');
+        
+        const imageModal = document.getElementById('imageModal');
+        const modalImage = document.getElementById('modalImage');
+        const pdfModal = document.getElementById('pdfModal');
+        const pdfViewer = document.getElementById('pdf-viewer');
 
         closeModalBtn.onclick = function() {
             modal.style.display = "none";
         }
 
+        document.querySelector('.image-modal-close').onclick = () => imageModal.style.display = "none";
+        document.querySelector('.pdf-modal-close').onclick = () => {
+            pdfModal.style.display = "none";
+            pdfViewer.src = ""; // Limpa o src para parar o carregamento do PDF
+        };
+
         window.onclick = function(event) {
             if (event.target == modal) {
                 modal.style.display = "none";
             }
+            if (event.target == imageModal) {
+                imageModal.style.display = "none";
+            }
+            if (event.target == pdfModal) {
+                pdfModal.style.display = "none";
+                pdfViewer.src = ""; // Limpa o src
+            }
         }
 
+        function showImageModal(src) { imageModal.style.display = "block"; modalImage.src = src; }
+        function showPdfModal(src) { pdfModal.style.display = "block"; pdfViewer.src = src; }
+        
         function viewCurriculo(id) {
             modalBody.innerHTML = '<p>Carregando detalhes...</p>';
             modal.style.display = 'block';
@@ -708,8 +798,8 @@ $totalCurriculos = $stmt->fetchColumn();
 
                             <h3><i class="fas fa-file-alt"></i> Arquivos</h3>
                             <div class="modal-files">
-                                <a href="uploads/${c.arquivo_curriculo}" target="_blank"><i class="fas fa-file-pdf"></i> Ver Currículo (PDF)</a>
-                                <a href="uploads/${c.arquivo_foto}" target="_blank"><i class="fas fa-camera"></i> Ver Foto</a>
+                                <a href="javascript:void(0);" onclick="showPdfModal('uploads/${c.arquivo_curriculo}')"><i class="fas fa-file-pdf"></i> Ver Currículo (PDF)</a>
+                                <a href="javascript:void(0);" onclick="showImageModal('uploads/${c.arquivo_foto}')"><i class="fas fa-camera"></i> Ver Foto</a>
                             </div>
 
                             <hr style="margin-top: 20px;">
