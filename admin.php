@@ -209,6 +209,37 @@ if (isAdmin()) {
         echo json_encode(['success' => true, 'logs' => $logs]);
         exit;
     }
+
+    // API para buscar detalhes de um currículo específico
+    if (isset($_GET['action']) && $_GET['action'] === 'getCurriculoDetails' && isset($_GET['id'])) {
+        header('Content-Type: application/json');
+        $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'ID inválido.']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM curriculos WHERE id = ?");
+        $stmt->execute([$id]);
+        $curriculo = $stmt->fetch();
+
+        if ($curriculo) {
+            // Decodificar o JSON de experiências para um formato mais amigável
+            if (!empty($curriculo['experiencias'])) {
+                $curriculo['experiencias'] = json_decode($curriculo['experiencias'], true);
+            }
+            // Converter valores booleanos de volta para texto para exibição
+            $curriculo['is_whatsapp'] = $curriculo['is_whatsapp'] ? 'Sim' : 'Não';
+            $curriculo['estudando'] = $curriculo['estudando'] ? 'Sim, estou!' : 'Não, não estou!';
+            $curriculo['possui_cursos'] = $curriculo['possui_cursos'] ? 'Sim' : 'Não';
+            $curriculo['possui_experiencia'] = $curriculo['possui_experiencia'] ? 'Sim' : 'Não';
+
+            echo json_encode(['success' => true, 'curriculo' => $curriculo]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Currículo não encontrado.']);
+        }
+        exit;
+    }
 }
 
 
@@ -272,6 +303,58 @@ $totalCurriculos = $stmt->fetchColumn();
         .tab-content.active { display: block; }
         .log-container { background: #1a1a1a; color: #00ff00; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.85rem; max-height: 400px; overflow-y: auto; }
         .config-note { background: #e0f2fe; border: 1px solid #0288d1; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+        
+        /* Estilos do Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.6);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px 30px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 800px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .modal-close {
+            color: #aaa;
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .modal-close:hover, .modal-close:focus { color: black; text-decoration: none; }
+        #modalBody h3 { border-bottom: 2px solid #1e40af; padding-bottom: 5px; margin-top: 20px; color: #1e40af; }
+        #modalBody p { margin: 5px 0 15px; line-height: 1.6; }
+        #modalBody strong { display: inline-block; min-width: 180px; color: #333; }
+        .modal-files a { display: inline-block; margin-right: 20px; text-decoration: none; background: #e0f2fe; color: #0c4a6e; padding: 8px 12px; border-radius: 6px; transition: background 0.3s; }
+        .modal-files a:hover { background: #bae6fd; }
+        .experience-block {
+            border-left: 3px solid #e5e7eb;
+            padding-left: 15px;
+            margin-bottom: 15px;
+        }
+        .experience-block h4 {
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
@@ -395,7 +478,16 @@ $totalCurriculos = $stmt->fetchColumn();
         </div>
     </div>
 
-    <!-- Modal para visualizar currículo (precisará ser adaptado) -->
+    <!-- Modal para Visualizar Currículo -->
+    <div id="curriculoModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2>Detalhes do Currículo</h2>
+            <div id="modalBody">
+                <!-- Conteúdo carregado via JS -->
+            </div>
+        </div>
+    </div>
 
     <script>
         function showTab(tabName) {
@@ -424,7 +516,7 @@ $totalCurriculos = $stmt->fetchColumn();
                                 <td>${c.email || 'N/A'}</td>
                                 <td>${c.cidade}</td>
                                 <td>
-                                    <button class="btn-primary btn-small">Ver</button>
+                                    <button class="btn-primary btn-small" onclick="viewCurriculo(${c.id})">Ver</button>
                                 </td>
                             </tr>
                         `).join('');
@@ -548,6 +640,89 @@ $totalCurriculos = $stmt->fetchColumn();
                     resultDiv.textContent = 'Erro na requisição: ' + err;
                 });
         });
+
+        // --- MODAL LOGIC ---
+        const modal = document.getElementById('curriculoModal');
+        const modalBody = document.getElementById('modalBody');
+        const closeModalBtn = document.querySelector('.modal-close');
+
+        closeModalBtn.onclick = function() {
+            modal.style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+
+        function viewCurriculo(id) {
+            modalBody.innerHTML = '<p>Carregando detalhes...</p>';
+            modal.style.display = 'block';
+
+            fetch(`admin.php?action=getCurriculoDetails&id=${id}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const c = data.curriculo;
+                        let experiencesHtml = '<p>Nenhuma experiência informada.</p>';
+                        if (c.experiencias && c.experiencias.length > 0) {
+                            experiencesHtml = c.experiencias.map((exp, index) => `
+                                <div class="experience-block">
+                                    <h4>Experiência ${index + 1}</h4>
+                                    <p><strong>Empresa:</strong> ${exp.company || 'N/A'}</p>
+                                    <p><strong>Cargo:</strong> ${exp.position || 'N/A'}</p>
+                                    <p><strong>Duração:</strong> ${exp.duration || 'N/A'}</p>
+                                </div>
+                            `).join('');
+                        }
+
+                        modalBody.innerHTML = `
+                            <h3><i class="fas fa-user"></i> Dados Pessoais</h3>
+                            <p><strong>Nome:</strong> ${c.nome}</p>
+                            <p><strong>Data de Nascimento:</strong> ${new Date(c.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                            <p><strong>Estado Civil:</strong> ${c.estado_civil}</p>
+
+                            <h3><i class="fas fa-phone"></i> Contato</h3>
+                            <p><strong>Telefone:</strong> ${c.telefone}</p>
+                            <p><strong>É WhatsApp?:</strong> ${c.is_whatsapp}</p>
+                            <p><strong>Email:</strong> ${c.email || 'Não informado'}</p>
+
+                            <h3><i class="fas fa-map-marker-alt"></i> Endereço</h3>
+                            <p><strong>Endereço:</strong> ${c.endereco}</p>
+                            <p><strong>Cidade:</strong> ${c.cidade}</p>
+                            <p><strong>Estado:</strong> ${c.estado}</p>
+
+                            <h3><i class="fas fa-graduation-cap"></i> Formação</h3>
+                            <p><strong>Escolaridade:</strong> ${c.escolaridade}</p>
+                            <p><strong>Está Estudando?:</strong> ${c.estudando}</p>
+                            ${c.periodo_estudo ? `<p><strong>Período de Estudo:</strong> ${c.periodo_estudo}</p>` : ''}
+                            <p><strong>Possui Cursos?:</strong> ${c.possui_cursos}</p>
+                            ${c.cursos ? `<p><strong>Cursos:</strong><br>${c.cursos.replace(/\n/g, '<br>')}</p>` : ''}
+
+                            <h3><i class="fas fa-briefcase"></i> Experiência Profissional</h3>
+                            ${experiencesHtml}
+
+                            <h3><i class="fas fa-target"></i> Objetivo</h3>
+                            <p>${c.motivacao.replace(/\n/g, '<br>')}</p>
+
+                            <h3><i class="fas fa-file-alt"></i> Arquivos</h3>
+                            <div class="modal-files">
+                                <a href="uploads/${c.arquivo_curriculo}" target="_blank"><i class="fas fa-file-pdf"></i> Ver Currículo (PDF)</a>
+                                <a href="uploads/${c.arquivo_foto}" target="_blank"><i class="fas fa-camera"></i> Ver Foto</a>
+                            </div>
+
+                            <hr style="margin-top: 20px;">
+                            <p><small>IP do Cadastro: ${c.ip_cadastro} | Data: ${new Date(c.data_cadastro).toLocaleString('pt-BR')}</small></p>
+                        `;
+                    } else {
+                        modalBody.innerHTML = `<p class="error-message">${data.message}</p>`;
+                    }
+                })
+                .catch(err => {
+                    modalBody.innerHTML = `<p class="error-message">Erro ao carregar os dados: ${err}</p>`;
+                });
+        }
 
         // Carregamento inicial
         document.addEventListener('DOMContentLoaded', function() {
