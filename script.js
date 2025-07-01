@@ -404,13 +404,33 @@ function handleCurriculumSubmit(e) {
     const resumeFile = formData.get('resume');
     const photoFile = formData.get('photo');
     
+    // Client-side validation for file size and type
+    const maxFileSize = 15 * 1024 * 1024; // 15MB
     if (!resumeFile || resumeFile.size === 0) {
         alert('❌ Por favor, anexe o currículo em PDF.');
+        return;
+    }
+    if (resumeFile.size > maxFileSize) {
+        alert('❌ O currículo é muito grande. Tamanho máximo permitido: 15MB.');
+        return;
+    }
+    if (!resumeFile.name.toLowerCase().endsWith('.pdf')) {
+        alert('❌ O currículo deve ser um arquivo PDF.');
         return;
     }
     
     if (!photoFile || photoFile.size === 0) {
         alert('❌ Por favor, anexe uma foto.');
+        return;
+    }
+    if (photoFile.size > maxFileSize) {
+        alert('❌ A foto é muito grande. Tamanho máximo permitido: 15MB.');
+        return;
+    }
+    const allowedPhotoExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+    const photoExtension = photoFile.name.split('.').pop().toLowerCase();
+    if (!allowedPhotoExtensions.includes(photoExtension)) {
+        alert('❌ A foto deve ser um arquivo JPG, JPEG, PNG ou GIF.');
         return;
     }
     
