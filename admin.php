@@ -24,97 +24,6 @@ function loadConfigFromDB($pdo) {
     return $config;
 }
 
-// Função para envio de email via SMTP
-function sendEmailSMTP($host, $port, $user, $pass, $from, $to, $subject, $body) {
-    $fp = fsockopen($host, $port, $errno, $errstr, 30);
-    if (!$fp) {
-        return false;
-    }
-
-    $response = fgets($fp, 515);
-    if (substr($response, 0, 3) != '220') {
-        fclose($fp);
-        return false;
-    }
-
-    fputs($fp, "EHLO $host\r\n");
-    $response = fgets($fp, 515);
-    if (substr($response, 0, 3) != '250') {
-        fclose($fp);
-        return false;
-    }
-
-    fputs($fp, "STARTTLS\r\n");
-    $response = fgets($fp, 515);
-    if (substr($response, 0, 3) != '220') {
-        fclose($fp);
-        return false;
-    }
-
-    stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
-    fputs($fp, "EHLO $host\r\n");
-    $response = fgets($fp, 515);
-
-    fputs($fp, "AUTH LOGIN\r\n");
-    $response = fgets($fp, 515);
-    if (substr($response, 0, 3) != '334') {
-        fclose($fp);
-        return false;
-    }
-
-    fputs($fp, base64_encode($user) . "\r\n");
-    $response = fgets($fp, 515);
-    if (substr($response, 0, 3) != '334') {
-        fclose($fp);
-        return false;
-    }
-
-    fputs($fp, base64_encode($pass) . "\r\n");
-    $response = fgets($fp, 515);
-    if (substr($response, 0, 3) != '235') {
-        fclose($fp);
-        return false;
-    }
-
-    fputs($fp, "MAIL FROM: <$from>\r\n");
-    $response = fgets($fp, 515);
-    if (substr($response, 0, 3) != '250') {
-        fclose($fp);
-        return false;
-    }
-
-    fputs($fp, "RCPT TO: <$to>\r\n");
-    $response = fgets($fp, 515);
-    if (substr($response, 0, 3) != '250') {
-        fclose($fp);
-        return false;
-    }
-
-    fputs($fp, "DATA\r\n");
-    $response = fgets($fp, 515);
-    if (substr($response, 0, 3) != '354') {
-        fclose($fp);
-        return false;
-    }
-
-    $headers = "From: $from\r\n";
-    $headers .= "To: $to\r\n";
-    $headers .= "Subject: $subject\r\n";
-    $headers .= "MIME-Version: 1.0\r\n";
-    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-
-    fputs($fp, $headers . "\r\n" . $body . "\r\n.\r\n");
-    $response = fgets($fp, 515);
-    if (substr($response, 0, 3) != '250') {
-        fclose($fp);
-        return false;
-    }
-
-    fputs($fp, "QUIT\r\n");
-    fclose($fp);
-    return true;
-}
-
 $config = loadConfigFromDB($pdo);
 
 // Garantir que configurações padrão existam
@@ -181,52 +90,6 @@ if (isAdmin() && empty($_SESSION['csrf_token'])) {
 
 // --- APIs INTERNAS (Ações do Painel) ---
 if (isAdmin()) {
-    // Teste de envio de email
-    if (isset($_POST['action']) && $_POST['action'] === 'testEmailSend') {
-        header('Content-Type: application/json');
-
-        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
-            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
-            exit;
-        }
-
-        $email = $_POST['email'] ?? '';
-        $subject = $_POST['subject'] ?? '';
-        $body = $_POST['body'] ?? '';
-
-        if (empty($email) || empty($subject) || empty($body)) {
-            echo json_encode(['success' => false, 'message' => 'Todos os campos são obrigatórios.']);
-            exit;
-        }
-
-        if (empty($config['smtp_from'])) {
-            echo json_encode(['success' => false, 'message' => 'Email remetente não configurado.']);
-            exit;
-        }
-
-        // Tentar SMTP se configurado, senão usar mail()
-        if (!empty($config['smtp_host']) && !empty($config['smtp_user']) && !empty($config['smtp_pass'])) {
-            // Usar SMTP
-            $success = sendEmailSMTP($config['smtp_host'], $config['smtp_port'], $config['smtp_user'], $config['smtp_pass'], $config['smtp_from'], $email, $subject, $body);
-        } else {
-            // Usar mail() do servidor
-            $fromEmail = $config['notification_email'];
-            $headers = "From: " . $fromEmail . "\r\n";
-            $headers .= "Reply-To: " . $fromEmail . "\r\n";
-            $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-            $success = mail($email, $subject, $body, $headers);
-        }
-
-        if ($success) {
-            logError("Email de teste enviado com sucesso para $email", 'INFO');
-            echo json_encode(['success' => true, 'message' => "Email enviado com sucesso para $email"]);
-        } else {
-            logError("Falha ao enviar email de teste para $email", 'ERROR');
-            echo json_encode(['success' => false, 'message' => "Falha ao enviar email para $email"]);
-        }
-        exit;
-    }
-
     // Teste de envio da API
     if (isset($_POST['action']) && $_POST['action'] === 'testApiSend') {
         header('Content-Type: application/json');
@@ -785,12 +648,11 @@ $totalCurriculos = $stmt->fetchColumn();
                 <!-- Tab Testes -->
                 <div id="tests-tab" class="tab-content">
                     <div class="config-note">
-                        <h4><i class="fas fa-vial"></i> Testar Envios</h4>
-                        <p>Use estas ferramentas para verificar se suas configurações estão corretas, enviando mensagens de teste.</p>
+                        <h4><i class="fas fa-vial"></i> Testar Envio de Mensagem</h4>
+                        <p>Use esta ferramenta para verificar se suas configurações da API estão corretas, enviando uma mensagem de teste.</p>
                     </div>
-
                     <form id="apiTestForm" class="config-form">
-                        <h3>Teste de Mensagem WhatsApp</h3>
+                        <h3>Teste de Mensagem de Texto</h3>
                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                         <div class="form-group">
                             <label>Número de Destino (com código do país)</label>
@@ -802,27 +664,6 @@ $totalCurriculos = $stmt->fetchColumn();
                         </div>
                         <button type="submit" class="btn-primary"><i class="fas fa-paper-plane"></i> Enviar Mensagem de Teste</button>
                         <div id="testResult" class="success-message" style="display: none; margin-top: 15px; white-space: pre-wrap; text-align: left;"></div>
-                    </form>
-
-                    <hr style="margin: 40px 0;">
-
-                    <form id="emailTestForm" class="config-form">
-                        <h3>Teste de Envio de Email</h3>
-                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
-                        <div class="form-group">
-                            <label>Email de Destino</label>
-                            <input type="email" id="testEmail" name="email" placeholder="teste@email.com" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Assunto</label>
-                            <input type="text" id="testSubject" name="subject" value="Teste de Email - Sistema de Currículos" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Mensagem</label>
-                            <textarea id="testEmailBody" name="body" rows="3" required>Olá! Isto é um email de teste do sistema de currículos.</textarea>
-                        </div>
-                        <button type="submit" class="btn-primary"><i class="fas fa-envelope"></i> Enviar Email de Teste</button>
-                        <div id="emailTestResult" class="success-message" style="display: none; margin-top: 15px; white-space: pre-wrap; text-align: left;"></div>
                     </form>
                 </div>
 
@@ -1096,32 +937,6 @@ $totalCurriculos = $stmt->fetchColumn();
 
             // Adicionar o token CSRF ao FormData para o fetch
             const csrfToken = document.querySelector('#apiTestForm input[name="csrf_token"]').value;
-            if (csrfToken) {
-                formData.append('csrf_token', csrfToken);
-            }
-
-            fetch('admin.php', { method: 'POST', body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    resultDiv.textContent = data.message;
-                })
-                .catch(err => {
-                    resultDiv.textContent = 'Erro na requisição: ' + err;
-                });
-        });
-
-        // Teste de Email
-        document.getElementById('emailTestForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const resultDiv = document.getElementById('emailTestResult');
-            resultDiv.style.display = 'block';
-            resultDiv.textContent = 'Enviando...';
-
-            const formData = new FormData(this);
-            formData.append('action', 'testEmailSend');
-
-            // Adicionar o token CSRF ao FormData para o fetch
-            const csrfToken = document.querySelector('#emailTestForm input[name="csrf_token"]').value;
             if (csrfToken) {
                 formData.append('csrf_token', csrfToken);
             }

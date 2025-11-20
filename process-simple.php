@@ -301,24 +301,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             logError("API Token ou Número de Notificação não configurado. Notificação pulada.", 'WARNING');
         }
 
-        // Enviar notificação por email
+        // Enviar notificação por email usando mail() do servidor
         if (!empty($config['smtp_from']) && !empty($config['notification_email'])) {
             $emailSubject = "Novo Currículo Recebido - " . $formData['name'];
             $emailBody = str_replace("*", "", $textMessage); // Remove markdown for plain text
-
-            // Tentar SMTP se configurado, senão usar mail()
-            if (!empty($config['smtp_host']) && !empty($config['smtp_user']) && !empty($config['smtp_pass'])) {
-                // Usar SMTP
-                $emailSuccess = sendEmailSMTP($config['smtp_host'], $config['smtp_port'], $config['smtp_user'], $config['smtp_pass'], $config['smtp_from'], $config['notification_email'], $emailSubject, $emailBody);
-            } else {
-                // Usar mail() do servidor
-                $fromEmail = $config['notification_email'];
-                $headers = "From: " . $fromEmail . "\r\n";
-                $headers .= "Reply-To: " . $fromEmail . "\r\n";
-                $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-                $emailSuccess = mail($config['notification_email'], $emailSubject, $emailBody, $headers);
-            }
-
+            $headers = "From: " . $config['smtp_from'] . "\r\n";
+            $headers .= "Reply-To: " . $config['smtp_from'] . "\r\n";
+            $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+            $emailSuccess = mail($config['notification_email'], $emailSubject, $emailBody, $headers);
             if (!$emailSuccess) {
                 logError("Falha ao enviar notificação por email", 'WARNING');
             }
