@@ -105,7 +105,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'api_token' => '',
                 'api_url' => 'https://app.whapichat.com.br:443/backend/api/messages/send',
                 'notification_number' => '5500000000000',
-                'completion_message' => 'Olá {nome}! Obrigado por se cadastrar no nosso sistema. Seu currículo foi recebido com sucesso e entraremos em contato em breve.'
+                'completion_message' => 'Olá {nome}! Obrigado por se cadastrar no nosso sistema. Seu currículo foi recebido com sucesso e entraremos em contato em breve.',
+                'smtp_host' => 'smtp.gmail.com',
+                'smtp_port' => '587',
+                'smtp_user' => '',
+                'smtp_pass' => '',
+                'smtp_from' => 'noreply@gorinformatica.com.br',
+                'notification_email' => 'rh@gorinformatica.com.br'
             ];
 
             $stmt_check = $pdo->prepare("SELECT id FROM config WHERE chave = ?");

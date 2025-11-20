@@ -31,7 +31,13 @@ $defaultConfigs = [
     'api_token' => '',
     'api_url' => 'https://app.whapichat.com.br:443/backend/api/messages/send',
     'notification_number' => '5500000000000',
-    'completion_message' => 'Olá {nome}! Obrigado por se cadastrar no nosso sistema. Seu currículo foi recebido com sucesso e entraremos em contato em breve.'
+    'completion_message' => 'Olá {nome}! Obrigado por se cadastrar no nosso sistema. Seu currículo foi recebido com sucesso e entraremos em contato em breve.',
+    'smtp_host' => 'smtp.gmail.com',
+    'smtp_port' => '587',
+    'smtp_user' => '',
+    'smtp_pass' => '',
+    'smtp_from' => 'noreply@gorinformatica.com.br',
+    'notification_email' => 'rh@gorinformatica.com.br'
 ];
 
 foreach ($defaultConfigs as $key => $value) {
@@ -135,6 +141,28 @@ if (isAdmin()) {
 
         $updated = 0;
         $params = ['api_url', 'api_token', 'notification_number', 'completion_message'];
+        $stmt = $pdo->prepare("UPDATE config SET valor = ? WHERE chave = ?");
+        foreach ($params as $param) {
+            if (isset($_POST[$param])) {
+                $stmt->execute([$_POST[$param], $param]);
+                $updated++;
+            }
+        }
+        echo json_encode(['success' => true, 'message' => "$updated configurações salvas!"]);
+        exit;
+    }
+
+    // Salvar configurações de email
+    if (isset($_POST['action']) && $_POST['action'] === 'saveEmailConfig') {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        $updated = 0;
+        $params = ['api_url', 'api_token', 'notification_number', 'completion_message', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from', 'notification_email'];
         $stmt = $pdo->prepare("UPDATE config SET valor = ? WHERE chave = ?");
         foreach ($params as $param) {
             if (isset($_POST[$param])) {
@@ -548,8 +576,41 @@ $totalCurriculos = $stmt->fetchColumn();
                             <label>Mensagem de Conclusão do Cadastro</label>
                             <textarea id="completionMessage" name="completion_message" rows="4" placeholder="Digite a mensagem que será enviada ao usuário após o cadastro. Use {nome} para substituir pelo nome do usuário."><?php echo htmlspecialchars($config['completion_message'] ?? ''); ?></textarea>
                         </div>
-                        <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Salvar Configurações da API</button>
+                        <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Salvar Configurações</button>
                         <div id="configApiSuccess" class="success-message" style="display: none;"></div>
+                    </form>
+
+                    <hr style="margin: 40px 0;">
+
+                    <form id="emailConfigForm" class="config-form">
+                        <h3>Configuração de Email SMTP</h3>
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                        <div class="form-group">
+                            <label>Servidor SMTP</label>
+                            <input type="text" id="smtpHost" name="smtp_host" value="<?php echo htmlspecialchars($config['smtp_host'] ?? ''); ?>">
+                        </div>
+                        <div class="form-group">
+                            <label>Porta SMTP</label>
+                            <input type="text" id="smtpPort" name="smtp_port" value="<?php echo htmlspecialchars($config['smtp_port'] ?? ''); ?>">
+                        </div>
+                        <div class="form-group">
+                            <label>Usuário SMTP</label>
+                            <input type="text" id="smtpUser" name="smtp_user" value="<?php echo htmlspecialchars($config['smtp_user'] ?? ''); ?>">
+                        </div>
+                        <div class="form-group">
+                            <label>Senha SMTP</label>
+                            <input type="password" id="smtpPass" name="smtp_pass" value="<?php echo htmlspecialchars($config['smtp_pass'] ?? ''); ?>">
+                        </div>
+                        <div class="form-group">
+                            <label>Email Remetente</label>
+                            <input type="email" id="smtpFrom" name="smtp_from" value="<?php echo htmlspecialchars($config['smtp_from'] ?? ''); ?>">
+                        </div>
+                        <div class="form-group">
+                            <label>Email para Notificações</label>
+                            <input type="email" id="notificationEmail" name="notification_email" value="<?php echo htmlspecialchars($config['notification_email'] ?? ''); ?>">
+                        </div>
+                        <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Salvar Configurações de Email</button>
+                        <div id="configEmailSuccess" class="success-message" style="display: none;"></div>
                     </form>
 
                     <hr style="margin: 40px 0;">
@@ -693,6 +754,28 @@ $totalCurriculos = $stmt->fetchColumn();
                 .then(res => res.json())
                 .then(data => {
                     const msgDiv = document.getElementById('configApiSuccess');
+                    msgDiv.textContent = data.message;
+                    msgDiv.style.display = 'block';
+                    setTimeout(() => msgDiv.style.display = 'none', 3000);
+                });
+        });
+
+        // Salvar Config Email
+        document.getElementById('emailConfigForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            formData.append('action', 'saveEmailConfig');
+
+            // Adicionar o token CSRF ao FormData para o fetch
+            const csrfToken = document.querySelector('#emailConfigForm input[name="csrf_token"]').value;
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken);
+            }
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    const msgDiv = document.getElementById('configEmailSuccess');
                     msgDiv.textContent = data.message;
                     msgDiv.style.display = 'block';
                     setTimeout(() => msgDiv.style.display = 'none', 3000);
