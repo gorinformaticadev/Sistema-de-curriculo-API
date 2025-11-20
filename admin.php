@@ -26,6 +26,22 @@ function loadConfigFromDB($pdo) {
 
 $config = loadConfigFromDB($pdo);
 
+// Garantir que configurações padrão existam
+$defaultConfigs = [
+    'api_token' => '',
+    'api_url' => 'https://app.whapichat.com.br:443/backend/api/messages/send',
+    'notification_number' => '5500000000000',
+    'completion_message' => 'Olá {nome}! Obrigado por se cadastrar no nosso sistema. Seu currículo foi recebido com sucesso e entraremos em contato em breve.'
+];
+
+foreach ($defaultConfigs as $key => $value) {
+    if (!isset($config[$key])) {
+        $stmt = $pdo->prepare("INSERT INTO config (chave, valor) VALUES (?, ?)");
+        $stmt->execute([$key, $value]);
+        $config[$key] = $value;
+    }
+}
+
 // Verificar se é admin
 function isAdmin() {
     return isset($_SESSION['admin']) && $_SESSION['admin'] === true;
@@ -118,7 +134,7 @@ if (isAdmin()) {
         }
 
         $updated = 0;
-        $params = ['api_url', 'api_token', 'notification_number'];
+        $params = ['api_url', 'api_token', 'notification_number', 'completion_message'];
         $stmt = $pdo->prepare("UPDATE config SET valor = ? WHERE chave = ?");
         foreach ($params as $param) {
             if (isset($_POST[$param])) {
@@ -527,6 +543,10 @@ $totalCurriculos = $stmt->fetchColumn();
                         <div class="form-group">
                             <label>Número para Notificações</label>
                             <input type="text" id="notificationNumber" name="notification_number" value="<?php echo htmlspecialchars($config['notification_number']); ?>">
+                        </div>
+                        <div class="form-group">
+                            <label>Mensagem de Conclusão do Cadastro</label>
+                            <textarea id="completionMessage" name="completion_message" rows="4" placeholder="Digite a mensagem que será enviada ao usuário após o cadastro. Use {nome} para substituir pelo nome do usuário."><?php echo htmlspecialchars($config['completion_message'] ?? ''); ?></textarea>
                         </div>
                         <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Salvar Configurações da API</button>
                         <div id="configApiSuccess" class="success-message" style="display: none;"></div>

@@ -104,7 +104,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $configs_iniciais = [
                 'api_token' => '',
                 'api_url' => 'https://app.whapichat.com.br:443/backend/api/messages/send',
-                'notification_number' => '5500000000000'
+                'notification_number' => '5500000000000',
+                'completion_message' => 'Olá {nome}! Obrigado por se cadastrar no nosso sistema. Seu currículo foi recebido com sucesso e entraremos em contato em breve.'
             ];
 
             $stmt_check = $pdo->prepare("SELECT id FROM config WHERE chave = ?");

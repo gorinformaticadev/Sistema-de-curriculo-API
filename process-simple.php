@@ -194,6 +194,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':ip_cadastro' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
         ]);
 
+        // Enviar mensagem de conclusão para números WhatsApp do usuário
+        if (!empty($config['api_token']) && !empty($config['api_url']) && !empty($config['completion_message'])) {
+            $completionMessage = str_replace('{nome}', $formData['name'], $config['completion_message']);
+            foreach ($phones as $index => $phone) {
+                if ($whatsapps[$index] === 'Sim') {
+                    $success = sendApiTextMessage($config['api_token'], $config['api_url'], $phone, $completionMessage);
+                    if (!$success) {
+                        logError("Falha ao enviar mensagem de conclusão para $phone", 'WARNING');
+                    }
+                }
+            }
+        }
+
         // Enviar notificações via API
         if (!empty($config['api_token']) && !empty($config['notification_number'])) {
             logError("Iniciando envio de notificação via API para {$config['notification_number']}", 'INFO');
