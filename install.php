@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $dbConnectContent = str_replace("define('DB_HOST', 'localhost');", "define('DB_HOST', 'localhost');", $dbConnectContent);
                 $dbConnectContent = str_replace("define('DB_USER', 'root');", "define('DB_USER', '" . addslashes($dbUser) . "');", $dbConnectContent);
                 $dbConnectContent = str_replace("define('DB_PASS', '');", "define('DB_PASS', '" . addslashes($dbPass) . "');", $dbConnectContent);
-                $dbConnectContent = str_replace("define('DB_NAME', 'caurri');", "define('DB_NAME', '" . addslashes($dbName) . "');", $dbConnectContent);
+                $dbConnectContent = str_replace("define('DB_NAME', 'curriculos');", "define('DB_NAME', '" . addslashes($dbName) . "');", $dbConnectContent);
 
                 file_put_contents($dbConnectPath, $dbConnectContent);
                 $steps[] = "Arquivo db_connect.php atualizado com as configurações do banco de dados.";

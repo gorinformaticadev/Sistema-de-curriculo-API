@@ -8,6 +8,7 @@ const newRegistrationBtn = document.getElementById('newRegistration');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
+    logAccess();
     initializeEventListeners();
     setupFormLogic();
 });
@@ -530,6 +531,12 @@ document.addEventListener('input', function(e) {
         formatPhone(e);
     }
 });
+
+// Log Access
+function logAccess() {
+    fetch('log_access.php', { method: 'POST' })
+        .catch(err => console.error('Erro ao logar acesso:', err));
+}
 
 // Debug: Log when script loads
 console.log('📜 Script.js carregado com sucesso (MODO API).');

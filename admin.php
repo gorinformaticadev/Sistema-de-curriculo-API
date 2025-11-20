@@ -254,6 +254,35 @@ if (isAdmin()) {
         exit;
     }
 
+    // API para carregar logs de acesso
+    if (isset($_GET['action']) && $_GET['action'] === 'getAccessLogs') {
+        header('Content-Type: application/json');
+        $logs = [];
+        if (file_exists('access.log')) {
+            $lines = file('access.log', FILE_IGNORE_NEW_LINES);
+            $logs = array_reverse(array_slice($lines, -100));
+        }
+        echo json_encode(['success' => true, 'logs' => $logs]);
+        exit;
+    }
+
+    // API para limpar logs de acesso
+    if (isset($_POST['action']) && $_POST['action'] === 'clearAccessLogs') {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        if (file_exists('access.log')) {
+            file_put_contents('access.log', '');
+            logError("Logs de acesso limpos pelo administrador", 'INFO');
+        }
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
     // API para buscar detalhes de um currículo específico
     if (isset($_GET['action']) && $_GET['action'] === 'getCurriculoDetails' && isset($_GET['id'])) {
         header('Content-Type: application/json');
@@ -537,6 +566,7 @@ $totalCurriculos = $stmt->fetchColumn();
                     <button class="tab" onclick="showTab('config')"><i class="fas fa-cog"></i> Configurações</button>
                     <button class="tab" onclick="showTab('tests')"><i class="fas fa-vial"></i> Testes da API</button>
                     <button class="tab" onclick="showTab('logs')"><i class="fas fa-file-alt"></i> Logs do Sistema</button>
+                    <button class="tab" onclick="showTab('access')"><i class="fas fa-eye"></i> Logs de Acesso</button>
                 </div>
 
                 <!-- Tab Currículos -->
@@ -654,6 +684,24 @@ $totalCurriculos = $stmt->fetchColumn();
                         </div>
                     </div>
                 </div>
+
+                <!-- Tab Access Logs -->
+                <div id="access-tab" class="tab-content">
+                    <div class="form-section">
+                        <h3><i class="fas fa-eye"></i> Logs de Acesso ao Formulário</h3>
+                        <div style="margin-bottom: 15px;">
+                            <button onclick="loadAccessLogs()" class="btn-secondary">
+                                <i class="fas fa-sync-alt"></i> Atualizar Logs de Acesso
+                            </button>
+                            <button onclick="clearAccessLogs()" class="btn-remove" style="background-color: #ef4444;">
+                                <i class="fas fa-trash"></i> Limpar Logs de Acesso
+                            </button>
+                        </div>
+                        <div id="accessLogsContainer" class="log-container">
+                            Carregando logs de acesso...
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -693,6 +741,8 @@ $totalCurriculos = $stmt->fetchColumn();
 
             if (tabName === 'logs') {
                 loadLogs();
+            } else if (tabName === 'access') {
+                loadAccessLogs();
             }
         }
 
@@ -829,6 +879,48 @@ $totalCurriculos = $stmt->fetchColumn();
                         loadLogs();
                     } else {
                         alert('Falha ao limpar os logs.');
+                    }
+                });
+        }
+
+        function loadAccessLogs() {
+            const container = document.getElementById('accessLogsContainer');
+            container.innerHTML = 'Carregando...';
+            fetch('admin.php?action=getAccessLogs')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.logs.length > 0) {
+                        container.innerHTML = data.logs.map(log => {
+                            let className = 'log-line';
+                            if (log.includes('[ACCESS]')) className += ' log-info';
+                            return `<div class="${className}">${log.replace(/</g, "<").replace(/>/g, ">")}</div>`;
+                        }).join('');
+                    } else {
+                        container.innerHTML = '<div class="log-line">Nenhum log de acesso encontrado.</div>';
+                    }
+                })
+                .catch(err => container.innerHTML = '<div class="log-line log-error">Erro ao carregar logs de acesso.</div>');
+        }
+
+        function clearAccessLogs() {
+            if (!confirm('Tem certeza que deseja limpar todos os logs de acesso? Esta ação não pode ser desfeita.')) {
+                return;
+            }
+            const formData = new FormData();
+            formData.append('action', 'clearAccessLogs');
+
+            // Adicionar o token CSRF ao FormData para o fetch
+            const csrfToken = document.querySelector('#apiConfigForm input[name="csrf_token"]').value;
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken);
+            }
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        loadAccessLogs();
+                    } else {
+                        alert('Falha ao limpar os logs de acesso.');
                     }
                 });
         }
