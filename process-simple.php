@@ -32,6 +32,10 @@ function sanitizeInput($data) {
     return htmlspecialchars(strip_tags(trim($data)));
 }
 
+function cleanPhoneNumber($phone) {
+    return preg_replace('/\D/', '', $phone);
+}
+
 function uploadFile($file, $allowedTypes, $prefix = '') {
     $uploadDir = 'uploads/';
     $maxFileSize = 15 * 1024 * 1024;
@@ -121,11 +125,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Coletar até 3 telefones e flags WhatsApp
         $phones = [];
+        $phones_clean = [];
         $whatsapps = [];
 
         // Primeiro telefone sem número no nome do campo
         if (!empty($_POST['phone'])) {
+            $phone_clean = cleanPhoneNumber($_POST['phone']);
             $phones[] = sanitizeInput($_POST['phone']);
+            $phones_clean[] = $phone_clean;
             $whatsapps[] = (isset($_POST['isWhatsapp']) && $_POST['isWhatsapp'] === 'Sim') ? 'Sim' : 'Não';
         }
 
@@ -134,7 +141,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $phoneKey = "phone$i";
             $whatsappKey = "isWhatsapp$i";
             if (!empty($_POST[$phoneKey])) {
+                $phone_clean = cleanPhoneNumber($_POST[$phoneKey]);
                 $phones[] = sanitizeInput($_POST[$phoneKey]);
+                $phones_clean[] = $phone_clean;
                 $whatsapps[] = (isset($_POST[$whatsappKey]) && $_POST[$whatsappKey] === 'Sim') ? 'Sim' : 'Não';
             }
         }
@@ -198,8 +207,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Enviar mensagem de conclusão para números WhatsApp do usuário
         if (!empty($config['api_token']) && !empty($config['api_url']) && !empty($config['completion_message'])) {
             $completionMessage = str_replace('{nome}', $formData['name'], $config['completion_message']);
-            foreach ($phones as $index => $phone) {
+            foreach ($phones_clean as $index => $phone) {
                 if ($whatsapps[$index] === 'Sim') {
+                    // Adicionar código do país se não tiver
+                    if (!str_starts_with($phone, '55')) {
+                        $phone = '55' . $phone;
+                    }
                     $success = sendApiTextMessage($config['api_token'], $config['api_url'], $phone, $completionMessage);
                     if (!$success) {
                         logError("Falha ao enviar mensagem de conclusão para $phone", 'WARNING');
