@@ -862,8 +862,8 @@ $totalCurriculos = $stmt->fetchColumn();
 
                             <h3><i class="fas fa-file-alt"></i> Arquivos</h3>
                             <div class="modal-files">
-                                <a href="javascript:void(0);" onclick="showPdfModal('uploads/${c.arquivo_curriculo}')"><i class="fas fa-file-pdf"></i> Ver Currículo (PDF)</a>
-                                <a href="javascript:void(0);" onclick="showImageModal('uploads/${c.arquivo_foto}')"><i class="fas fa-camera"></i> Ver Foto</a>
+                                <a href="javascript:void(0);" onclick="showPdfModal('uploads/' + encodeURIComponent('${c.arquivo_curriculo}'))"><i class="fas fa-file-pdf"></i> Ver Currículo (PDF)</a>
+                                <a href="javascript:void(0);" onclick="showImageModal('uploads/' + encodeURIComponent('${c.arquivo_foto}'))"><i class="fas fa-camera"></i> Ver Foto</a>
                             </div>
 
                             <hr style="margin-top: 20px;">

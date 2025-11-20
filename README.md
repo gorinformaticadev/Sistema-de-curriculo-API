@@ -6,7 +6,7 @@ Sistema completo para cadastro de currículos com área administrativa.
 
 - **Frontend**: HTML5, CSS3, JavaScript puro
 - **Backend**: PHP puro
-- **Banco de Dados**: Arquivo de log (sem necessidade de MySQL)
+- **Banco de Dados**: MySQL
 - **Upload**: Suporte a PDF (currículo) e imagens (foto)
 - **Email**: Envio automático de notificações
 - **Responsivo**: Funciona em desktop e mobile

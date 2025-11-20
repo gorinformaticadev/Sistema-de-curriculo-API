@@ -727,3 +727,25 @@ body {
         padding: 20px;
     }
 }
+
+#typing-text {
+    font-size: 1.2em;
+    margin-bottom: 20px;
+}
+
+#next-button {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.hidden-section {
+    display: none;
+}
+
+.hidden-section {
+    display: none;
+}
