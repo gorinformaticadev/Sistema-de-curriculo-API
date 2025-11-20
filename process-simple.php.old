@@ -32,10 +32,6 @@ function sanitizeInput($data) {
     return htmlspecialchars(strip_tags(trim($data)));
 }
 
-function cleanPhoneNumber($phone) {
-    return preg_replace('/\D/', '', $phone);
-}
-
 function uploadFile($file, $allowedTypes, $prefix = '') {
     $uploadDir = 'uploads/';
     $maxFileSize = 15 * 1024 * 1024;
@@ -109,7 +105,6 @@ function sendApiMediaMessage($token, $url, $number, $filePath, $fileName) {
     return $httpcode === 200;
 }
 
-
 // --- PROCESSAMENTO PRINCIPAL ---
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -125,14 +120,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Coletar até 3 telefones e flags WhatsApp
         $phones = [];
-        $phones_clean = [];
         $whatsapps = [];
 
         // Primeiro telefone sem número no nome do campo
         if (!empty($_POST['phone'])) {
-            $phone_clean = cleanPhoneNumber($_POST['phone']);
             $phones[] = sanitizeInput($_POST['phone']);
-            $phones_clean[] = $phone_clean;
             $whatsapps[] = (isset($_POST['isWhatsapp']) && $_POST['isWhatsapp'] === 'Sim') ? 'Sim' : 'Não';
         }
 
@@ -141,9 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $phoneKey = "phone$i";
             $whatsappKey = "isWhatsapp$i";
             if (!empty($_POST[$phoneKey])) {
-                $phone_clean = cleanPhoneNumber($_POST[$phoneKey]);
                 $phones[] = sanitizeInput($_POST[$phoneKey]);
-                $phones_clean[] = $phone_clean;
                 $whatsapps[] = (isset($_POST[$whatsappKey]) && $_POST[$whatsappKey] === 'Sim') ? 'Sim' : 'Não';
             }
         }
@@ -180,46 +170,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            ':nome' => addslashes($formData['name']),
+            ':nome' => $formData['name'],
             ':data_nascimento' => $formData['birthDate'],
-            ':estado_civil' => addslashes($formData['maritalStatus']),
-            ':telefone' => addslashes($formData['phone']), // concatenated phones
+            ':estado_civil' => $formData['maritalStatus'],
+            ':telefone' => $formData['phone'], // concatenated phones
             ':is_whatsapp' => $isWhatsapp_db,
-            ':email' => addslashes($formData['email']),
-            ':facebook' => addslashes($formData['facebook']),
-            ':instagram' => addslashes($formData['instagram']),
-            ':endereco' => addslashes($formData['address']),
-            ':cidade' => addslashes($formData['city']),
-            ':estado' => addslashes($formData['state']),
-            ':escolaridade' => addslashes($formData['education']),
+            ':email' => $formData['email'],
+            ':facebook' => $formData['facebook'],
+            ':instagram' => $formData['instagram'],
+            ':endereco' => $formData['address'],
+            ':cidade' => $formData['city'],
+            ':estado' => $formData['state'],
+            ':escolaridade' => $formData['education'],
             ':estudando' => $isStudying_db,
-            ':periodo_estudo' => addslashes($formData['studyPeriod']),
+            ':periodo_estudo' => $formData['studyPeriod'],
             ':possui_cursos' => $hasCourses_db,
-            ':cursos' => addslashes($formData['courses']),
+            ':cursos' => $formData['courses'],
             ':possui_experiencia' => $hasExperience_db,
             ':experiencias' => $formData['experiences'],
-            ':motivacao' => addslashes($formData['motivation']),
+            ':motivacao' => $formData['motivation'],
             ':arquivo_curriculo' => $resumeFile,
             ':arquivo_foto' => $photoFile,
             ':ip_cadastro' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
         ]);
-
-        // Enviar mensagem de conclusão para números WhatsApp do usuário
-        if (!empty($config['api_token']) && !empty($config['api_url']) && !empty($config['completion_message'])) {
-            $completionMessage = str_replace('{nome}', $formData['name'], $config['completion_message']);
-            foreach ($phones_clean as $index => $phone) {
-                if ($whatsapps[$index] === 'Sim') {
-                    // Adicionar código do país se não tiver
-                    if (!str_starts_with($phone, '55')) {
-                        $phone = '55' . $phone;
-                    }
-                    $success = sendApiTextMessage($config['api_token'], $config['api_url'], $phone, $completionMessage);
-                    if (!$success) {
-                        logError("Falha ao enviar mensagem de conclusão para $phone", 'WARNING');
-                    }
-                }
-            }
-        }
 
         // Enviar notificações via API
         if (!empty($config['api_token']) && !empty($config['notification_number'])) {
@@ -299,31 +272,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } else {
             logError("API Token ou Número de Notificação não configurado. Notificação pulada.", 'WARNING');
-        }
-
-        // Enviar notificação por email
-        if (!empty($config['smtp_from']) && !empty($config['notification_email'])) {
-            $emailSubject = "Novo Currículo Recebido - " . $formData['name'];
-            $emailBody = str_replace("*", "", $textMessage); // Remove markdown for plain text
-
-            // Tentar SMTP se configurado, senão usar mail()
-            if (!empty($config['smtp_host']) && !empty($config['smtp_user']) && !empty($config['smtp_pass'])) {
-                // Usar SMTP
-                $emailSuccess = sendEmailSMTP($config['smtp_host'], $config['smtp_port'], $config['smtp_user'], $config['smtp_pass'], $config['smtp_from'], $config['notification_email'], $emailSubject, $emailBody);
-            } else {
-                // Usar mail() do servidor
-                $fromEmail = $config['notification_email'];
-                $headers = "From: " . $fromEmail . "\r\n";
-                $headers .= "Reply-To: " . $fromEmail . "\r\n";
-                $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-                $emailSuccess = mail($config['notification_email'], $emailSubject, $emailBody, $headers);
-            }
-
-            if (!$emailSuccess) {
-                logError("Falha ao enviar notificação por email", 'WARNING');
-            }
-        } else {
-            logError("Email remetente ou destinatário não configurado. Notificação por email pulada.", 'WARNING');
         }
 
         echo json_encode(['success' => true, 'message' => 'Currículo cadastrado com sucesso!']);
