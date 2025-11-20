@@ -105,6 +105,7 @@ function sendApiMediaMessage($token, $url, $number, $filePath, $fileName) {
     return $httpcode === 200;
 }
 
+
 // --- PROCESSAMENTO PRINCIPAL ---
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -285,6 +286,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } else {
             logError("API Token ou Número de Notificação não configurado. Notificação pulada.", 'WARNING');
+        }
+
+        // Enviar notificação por email usando mail() do servidor
+        if (!empty($config['smtp_from']) && !empty($config['notification_email'])) {
+            $emailSubject = "Novo Currículo Recebido - " . $formData['name'];
+            $emailBody = str_replace("*", "", $textMessage); // Remove markdown for plain text
+            $headers = "From: " . $config['smtp_from'] . "\r\n";
+            $headers .= "Reply-To: " . $config['smtp_from'] . "\r\n";
+            $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+            $emailSuccess = mail($config['notification_email'], $emailSubject, $emailBody, $headers);
+            if (!$emailSuccess) {
+                logError("Falha ao enviar notificação por email", 'WARNING');
+            }
+        } else {
+            logError("Email remetente ou destinatário não configurado. Notificação por email pulada.", 'WARNING');
         }
 
         echo json_encode(['success' => true, 'message' => 'Currículo cadastrado com sucesso!']);

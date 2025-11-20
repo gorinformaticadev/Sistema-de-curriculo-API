@@ -162,7 +162,7 @@ if (isAdmin()) {
         }
 
         $updated = 0;
-        $params = ['api_url', 'api_token', 'notification_number', 'completion_message', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from', 'notification_email'];
+        $params = ['smtp_from', 'notification_email'];
         $stmt = $pdo->prepare("UPDATE config SET valor = ? WHERE chave = ?");
         foreach ($params as $param) {
             if (isset($_POST[$param])) {
@@ -583,31 +583,15 @@ $totalCurriculos = $stmt->fetchColumn();
                     <hr style="margin: 40px 0;">
 
                     <form id="emailConfigForm" class="config-form">
-                        <h3>Configuração de Email SMTP</h3>
+                        <h3>Configuração de Email</h3>
                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                         <div class="form-group">
-                            <label>Servidor SMTP</label>
-                            <input type="text" id="smtpHost" name="smtp_host" value="<?php echo htmlspecialchars($config['smtp_host'] ?? ''); ?>">
-                        </div>
-                        <div class="form-group">
-                            <label>Porta SMTP</label>
-                            <input type="text" id="smtpPort" name="smtp_port" value="<?php echo htmlspecialchars($config['smtp_port'] ?? ''); ?>">
-                        </div>
-                        <div class="form-group">
-                            <label>Usuário SMTP</label>
-                            <input type="text" id="smtpUser" name="smtp_user" value="<?php echo htmlspecialchars($config['smtp_user'] ?? ''); ?>">
-                        </div>
-                        <div class="form-group">
-                            <label>Senha SMTP</label>
-                            <input type="password" id="smtpPass" name="smtp_pass" value="<?php echo htmlspecialchars($config['smtp_pass'] ?? ''); ?>">
-                        </div>
-                        <div class="form-group">
                             <label>Email Remetente</label>
-                            <input type="email" id="smtpFrom" name="smtp_from" value="<?php echo htmlspecialchars($config['smtp_from'] ?? ''); ?>">
+                            <input type="email" id="smtpFrom" name="smtp_from" value="<?php echo htmlspecialchars($config['smtp_from'] ?? ''); ?>" required>
                         </div>
                         <div class="form-group">
                             <label>Email para Notificações</label>
-                            <input type="email" id="notificationEmail" name="notification_email" value="<?php echo htmlspecialchars($config['notification_email'] ?? ''); ?>">
+                            <input type="email" id="notificationEmail" name="notification_email" value="<?php echo htmlspecialchars($config['notification_email'] ?? ''); ?>" required>
                         </div>
                         <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Salvar Configurações de Email</button>
                         <div id="configEmailSuccess" class="success-message" style="display: none;"></div>
