@@ -290,6 +290,27 @@ if (isAdmin()) {
         exit;
     }
 
+    // API para limpar interações do formulário
+    if (isset($_POST['action']) && $_POST['action'] === 'clearInteractions') {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        try {
+            $stmt = $pdo->prepare("TRUNCATE TABLE form_interactions");
+            $stmt->execute();
+            logError("Todas as interações foram limpas pelo administrador", 'WARNING');
+            echo json_encode(['success' => true, 'message' => 'Todas as interações foram limpas com sucesso.']);
+        } catch (PDOException $e) {
+            logError('Erro ao limpar interações: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erro ao limpar interações.']);
+        }
+        exit;
+    }
+
     // API para buscar detalhes de um currículo específico
     if (isset($_GET['action']) && $_GET['action'] === 'getCurriculoDetails' && isset($_GET['id'])) {
         header('Content-Type: application/json');
@@ -512,7 +533,7 @@ if (isAdmin()) {
 
             // Para cada sessão, verificar se foi completada
             foreach ($sessions as &$session) {
-                // Verificar se existe currículo cadastrado próximo ao horário da sessão
+                // 1. Verificar se existe currículo cadastrado próximo ao horário da sessão
                 $stmt = $pdo->prepare("
                     SELECT id FROM curriculos 
                     WHERE ip_cadastro = ? 
@@ -520,7 +541,19 @@ if (isAdmin()) {
                     LIMIT 1
                 ");
                 $stmt->execute([$session['ip'], $session['last_interaction']]);
-                $session['completed'] = $stmt->rowCount() > 0;
+                $hasCurriculo = $stmt->rowCount() > 0;
+
+                // 2. Verificar se houve clique no botão de finalizar (ação 'form_submitted')
+                $stmt2 = $pdo->prepare("
+                    SELECT 1 FROM form_interactions 
+                    WHERE session_id = ? 
+                    AND acao = 'form_submitted' 
+                    LIMIT 1
+                ");
+                $stmt2->execute([$session['session_id']]);
+                $hasSubmitAction = $stmt2->rowCount() > 0;
+
+                $session['completed'] = $hasCurriculo || $hasSubmitAction;
             }
 
             echo json_encode([
@@ -553,6 +586,7 @@ if (isAdmin()) {
                     timestamp
                 FROM form_interactions
                 WHERE session_id = ?
+                AND acao != 'form_submitted'
                 ORDER BY timestamp ASC
             ");
             
@@ -1042,6 +1076,7 @@ $totalCurriculos = $stmt->fetchColumn();
                                 <input type="text" id="filterName" placeholder="Digite o nome..." onkeyup="loadInteractions()">
                             </div>
                             <button class="btn-secondary" onclick="loadInteractions()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                            <button class="btn-remove" onclick="clearInteractions()" style="background-color: #ef4444;"><i class="fas fa-trash"></i> Limpar Tudo</button>
                         </div>
                     </div>
 
@@ -1629,6 +1664,35 @@ $totalCurriculos = $stmt->fetchColumn();
             html += '</div>';
             
             container.innerHTML = html;
+        }
+
+        function clearInteractions() {
+            if (!confirm('Tem certeza que deseja limpar TODAS as interações? Esta ação não pode ser desfeita.')) {
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('action', 'clearInteractions');
+
+            // Tentar pegar token CSRF de algum form existente na página
+            const csrfTokenInput = document.querySelector('input[name="csrf_token"]');
+            if (csrfTokenInput) {
+                formData.append('csrf_token', csrfTokenInput.value);
+            }
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        loadInteractions();
+                        loadInteractionStats();
+                        loadAbandonmentAnalysis();
+                    } else {
+                        alert('Erro: ' + data.message);
+                    }
+                })
+                .catch(err => alert('Erro ao processar a solicitação.'));
         }
 
         function loadInteractions() {

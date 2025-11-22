@@ -73,28 +73,20 @@ class FormTracker {
 
         // Rastrear inputs de texto
         form.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="date"]').forEach(input => {
-            input.addEventListener('focus', (e) => {
-                if (e.target.name !== 'name') this.logInteraction(e.target, 'focus');
-            });
-            input.addEventListener('blur', (e) => {
-                if (e.target.name !== 'name') this.logInteraction(e.target, 'blur');
-            });
             input.addEventListener('change', (e) => {
                 if (e.target.name !== 'name') this.logInteraction(e.target, 'change');
             });
             // Removido evento 'input' para evitar excesso de logs (cada tecla)
+            // Removidos eventos 'focus' e 'blur' para limpar logs
         });
 
         // Rastrear textareas
         form.querySelectorAll('textarea').forEach(textarea => {
-            textarea.addEventListener('focus', (e) => this.logInteraction(e.target, 'focus'));
-            textarea.addEventListener('blur', (e) => this.logInteraction(e.target, 'blur'));
             textarea.addEventListener('change', (e) => this.logInteraction(e.target, 'change'));
         });
 
         // Rastrear selects
         form.querySelectorAll('select').forEach(select => {
-            select.addEventListener('focus', (e) => this.logInteraction(e.target, 'focus'));
             select.addEventListener('change', (e) => this.logInteraction(e.target, 'change'));
         });
 
@@ -120,6 +112,14 @@ class FormTracker {
             // Apenas capturamos change (ao sair do campo/finalizar edição)
             nameInput.addEventListener('change', (e) => {
                 this.logInteraction(e.target, 'change');
+            });
+        }
+
+        // Rastrear botão de finalizar cadastro
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.addEventListener('click', (e) => {
+                this.logInteraction(e.target, 'form_submitted');
             });
         }
     }

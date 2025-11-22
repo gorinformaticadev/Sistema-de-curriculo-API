@@ -1,1 +1,8 @@
 [2025-11-22 21:31:25] [INFO] [IP: ::1] Logs limpos pelo administrador
+[2025-11-22 21:54:00] [WARNING] [IP: ::1] Todas as interações foram limpas pelo administrador
+[2025-11-22 21:54:55] [WARNING] [IP: ::1] API Token ou Número de Notificação não configurado. Notificação pulada.
+[2025-11-22 21:54:57] [WARNING] [IP: ::1] Falha ao enviar notificação por email
+[2025-11-22 21:57:45] [WARNING] [IP: ::1] API Token ou Número de Notificação não configurado. Notificação pulada.
+[2025-11-22 21:57:47] [WARNING] [IP: ::1] Falha ao enviar notificação por email
+[2025-11-22 22:01:32] [WARNING] [IP: ::1] API Token ou Número de Notificação não configurado. Notificação pulada.
+[2025-11-22 22:01:34] [WARNING] [IP: ::1] Falha ao enviar notificação por email
