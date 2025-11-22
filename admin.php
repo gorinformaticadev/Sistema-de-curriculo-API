@@ -365,6 +365,202 @@ if (isAdmin()) {
         }
         exit;
     }
+
+    // API para buscar estatísticas de interações
+    if (isset($_GET['action']) && $_GET['action'] === 'getInteractionStats') {
+        header('Content-Type: application/json');
+        
+        try {
+            // Total de sessões únicas
+            $stmt = $pdo->query("SELECT COUNT(DISTINCT session_id) as total FROM form_interactions");
+            $totalSessions = $stmt->fetchColumn();
+
+            // Formulários completos (sessões que têm registro na tabela curriculos)
+            $stmt = $pdo->query("
+                SELECT COUNT(DISTINCT fi.session_id) as total 
+                FROM form_interactions fi
+                INNER JOIN curriculos c ON DATE(fi.timestamp) = DATE(c.data_cadastro)
+            ");
+            $completedForms = $stmt->fetchColumn();
+
+            // Abandonos
+            $abandonedForms = $totalSessions - $completedForms;
+
+            // Taxa de conversão
+            $conversionRate = $totalSessions > 0 ? round(($completedForms / $totalSessions) * 100, 1) : 0;
+
+            echo json_encode([
+                'success' => true,
+                'stats' => [
+                    'totalSessions' => $totalSessions,
+                    'completedForms' => $completedForms,
+                    'abandonedForms' => $abandonedForms,
+                    'conversionRate' => $conversionRate . '%'
+                ]
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // API para buscar análise de abandono
+    if (isset($_GET['action']) && $_GET['action'] === 'getAbandonmentAnalysis') {
+        header('Content-Type: application/json');
+        
+        try {
+            // Buscar último campo de cada sessão que não completou o formulário
+            $stmt = $pdo->query("
+                SELECT 
+                    ultimo_campo,
+                    COUNT(*) as count
+                FROM (
+                    SELECT 
+                        session_id,
+                        ultimo_campo,
+                        MAX(timestamp) as last_time
+                    FROM form_interactions
+                    WHERE ultimo_campo IS NOT NULL
+                    GROUP BY session_id
+                ) as last_interactions
+                GROUP BY ultimo_campo
+                ORDER BY count DESC
+                LIMIT 10
+            ");
+            
+            $abandonmentData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            echo json_encode([
+                'success' => true,
+                'data' => $abandonmentData
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // API para buscar sessões de interações
+    if (isset($_GET['action']) && $_GET['action'] === 'getInteractionSessions') {
+        header('Content-Type: application/json');
+        
+        $period = $_GET['period'] ?? 'week';
+        $device = $_GET['device'] ?? '';
+        $name = $_GET['name'] ?? '';
+
+        try {
+            // Construir query com filtros
+            $where = ["1=1"];
+            $params = [];
+
+            // Filtro de período
+            switch ($period) {
+                case 'today':
+                    $where[] = "DATE(timestamp) = CURDATE()";
+                    break;
+                case 'week':
+                    $where[] = "timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+                    break;
+                case 'month':
+                    $where[] = "timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                    break;
+            }
+
+            // Filtro de dispositivo
+            if ($device) {
+                $where[] = "device = ?";
+                $params[] = $device;
+            }
+
+            // Filtro de nome
+            if ($name) {
+                $where[] = "nome_completo LIKE ?";
+                $params[] = "%$name%";
+            }
+
+            $whereClause = implode(" AND ", $where);
+
+            // Buscar sessões agrupadas
+            $stmt = $pdo->prepare("
+                SELECT 
+                    session_id,
+                    ip,
+                    browser,
+                    os,
+                    device,
+                    nome_completo,
+                    ultimo_campo,
+                    MIN(timestamp) as first_interaction,
+                    MAX(timestamp) as last_interaction,
+                    COUNT(*) as interaction_count
+                FROM form_interactions
+                WHERE $whereClause
+                GROUP BY session_id
+                ORDER BY last_interaction DESC
+                LIMIT 50
+            ");
+            
+            $stmt->execute($params);
+            $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Para cada sessão, verificar se foi completada
+            foreach ($sessions as &$session) {
+                // Verificar se existe currículo cadastrado próximo ao horário da sessão
+                $stmt = $pdo->prepare("
+                    SELECT id FROM curriculos 
+                    WHERE ip_cadastro = ? 
+                    AND ABS(TIMESTAMPDIFF(MINUTE, data_cadastro, ?)) <= 30
+                    LIMIT 1
+                ");
+                $stmt->execute([$session['ip'], $session['last_interaction']]);
+                $session['completed'] = $stmt->rowCount() > 0;
+            }
+
+            echo json_encode([
+                'success' => true,
+                'sessions' => $sessions
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // API para buscar detalhes de uma sessão específica
+    if (isset($_GET['action']) && $_GET['action'] === 'getSessionDetails') {
+        header('Content-Type: application/json');
+        
+        $sessionId = $_GET['session_id'] ?? '';
+
+        if (!$sessionId) {
+            echo json_encode(['success' => false, 'message' => 'Session ID não fornecido']);
+            exit;
+        }
+
+        try {
+            $stmt = $pdo->prepare("
+                SELECT 
+                    ultimo_campo,
+                    acao,
+                    valor_campo,
+                    timestamp
+                FROM form_interactions
+                WHERE session_id = ?
+                ORDER BY timestamp ASC
+            ");
+            
+            $stmt->execute([$sessionId]);
+            $interactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            echo json_encode([
+                'success' => true,
+                'interactions' => $interactions
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
 }
 
 
@@ -543,6 +739,201 @@ $totalCurriculos = $stmt->fetchColumn();
             height: 100%;
             border-radius: 12px;
         }
+
+        /* Estilos para Interações do Formulário */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+        }
+        .stat-info h4 {
+            margin: 0 0 5px 0;
+            font-size: 0.9rem;
+            color: #6b7280;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #1f2937;
+            margin: 0;
+        }
+        .filters-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .filters-section h4 {
+            margin-top: 0;
+            color: #1f2937;
+        }
+        .filters-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .filter-group label {
+            font-size: 0.9rem;
+            color: #6b7280;
+            font-weight: 600;
+        }
+        .filter-group select,
+        .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        .abandonment-analysis {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .abandonment-analysis h4 {
+            margin-top: 0;
+            color: #1f2937;
+        }
+        .chart-container {
+            max-width: 800px;
+            margin: 20px auto;
+        }
+        .sessions-list {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .sessions-list h4 {
+            margin-top: 0;
+            color: #1f2937;
+        }
+        .session-card {
+            background: #f9fafb;
+            border-left: 4px solid #3b82f6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+        .session-card:hover {
+            background: #f3f4f6;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .session-card.completed {
+            border-left-color: #10b981;
+        }
+        .session-card.abandoned {
+            border-left-color: #ef4444;
+        }
+        .session-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .session-info {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .session-info-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.9rem;
+            color: #6b7280;
+        }
+        .session-info-item i {
+            color: #3b82f6;
+        }
+        .session-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .session-badge.completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .session-badge.abandoned {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .session-badge.in-progress {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .session-timeline {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e5e7eb;
+        }
+        .timeline-item {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+        }
+        .timeline-time {
+            color: #9ca3af;
+            min-width: 80px;
+        }
+        .timeline-action {
+            color: #4b5563;
+        }
+        .timeline-field {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .btn-expand {
+            background: transparent;
+            border: 1px solid #d1d5db;
+            color: #6b7280;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+        .btn-expand:hover {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+        }
     </style>
 </head>
 <body>
@@ -563,6 +954,7 @@ $totalCurriculos = $stmt->fetchColumn();
 
                 <div class="tabs">
                     <button class="tab active" onclick="showTab('curriculos')"><i class="fas fa-list"></i> Currículos</button>
+                    <button class="tab" onclick="showTab('interactions')"><i class="fas fa-chart-line"></i> Interações do Formulário</button>
                     <button class="tab" onclick="showTab('config')"><i class="fas fa-cog"></i> Configurações</button>
                     <button class="tab" onclick="showTab('tests')"><i class="fas fa-vial"></i> Testes da API</button>
                     <button class="tab" onclick="showTab('logs')"><i class="fas fa-file-alt"></i> Logs do Sistema</button>
@@ -578,6 +970,89 @@ $totalCurriculos = $stmt->fetchColumn();
                             <!-- Conteúdo carregado via JS -->
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Tab Interações do Formulário -->
+                <div id="interactions-tab" class="tab-content">
+                    <h3><i class="fas fa-chart-line"></i> Análise de Interações do Formulário</h3>
+                    
+                    <!-- Cards de Estatísticas -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: #3b82f6;"><i class="fas fa-mouse-pointer"></i></div>
+                            <div class="stat-info">
+                                <h4>Total de Sessões</h4>
+                                <p class="stat-value" id="totalSessions">-</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: #10b981;"><i class="fas fa-check-circle"></i></div>
+                            <div class="stat-info">
+                                <h4>Formulários Completos</h4>
+                                <p class="stat-value" id="completedForms">-</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: #ef4444;"><i class="fas fa-times-circle"></i></div>
+                            <div class="stat-info">
+                                <h4>Abandonos</h4>
+                                <p class="stat-value" id="abandonedForms">-</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: #f59e0b;"><i class="fas fa-percentage"></i></div>
+                            <div class="stat-info">
+                                <h4>Taxa de Conversão</h4>
+                                <p class="stat-value" id="conversionRate">-</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtros -->
+                    <div class="filters-section">
+                        <h4><i class="fas fa-filter"></i> Filtros</h4>
+                        <div class="filters-row">
+                            <div class="filter-group">
+                                <label>Período:</label>
+                                <select id="filterPeriod" onchange="loadInteractions()">
+                                    <option value="today">Hoje</option>
+                                    <option value="week" selected>Última Semana</option>
+                                    <option value="month">Último Mês</option>
+                                    <option value="all">Todos</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>Dispositivo:</label>
+                                <select id="filterDevice" onchange="loadInteractions()">
+                                    <option value="">Todos</option>
+                                    <option value="Desktop">Desktop</option>
+                                    <option value="Mobile">Mobile</option>
+                                    <option value="Tablet">Tablet</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>Buscar por Nome:</label>
+                                <input type="text" id="filterName" placeholder="Digite o nome..." onkeyup="loadInteractions()">
+                            </div>
+                            <button class="btn-secondary" onclick="loadInteractions()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                        </div>
+                    </div>
+
+                    <!-- Campo Mais Abandonado -->
+                    <div class="abandonment-analysis">
+                        <h4><i class="fas fa-exclamation-triangle"></i> Campos com Maior Abandono</h4>
+                        <div id="abandonmentChart" class="chart-container">
+                            <canvas id="abandonmentCanvas"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Sessões -->
+                    <div class="sessions-list">
+                        <h4><i class="fas fa-users"></i> Sessões Recentes</h4>
+                        <div id="sessionsContainer">
+                            <p>Carregando sessões...</p>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Tab Configurações -->
@@ -743,6 +1218,10 @@ $totalCurriculos = $stmt->fetchColumn();
                 loadLogs();
             } else if (tabName === 'access') {
                 loadAccessLogs();
+            } else if (tabName === 'interactions') {
+                loadInteractionStats();
+                loadAbandonmentAnalysis();
+                loadInteractions();
             }
         }
 
@@ -1090,6 +1569,227 @@ $totalCurriculos = $stmt->fetchColumn();
                     }
                 })
                 .catch(err => alert('Ocorreu um erro de comunicação com o servidor.'));
+        }
+
+        // --- FUNÇÕES DE INTERAÇÕES DO FORMULÁRIO ---
+        
+        function loadInteractionStats() {
+            fetch('admin.php?action=getInteractionStats')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('totalSessions').textContent = data.stats.totalSessions;
+                        document.getElementById('completedForms').textContent = data.stats.completedForms;
+                        document.getElementById('abandonedForms').textContent = data.stats.abandonedForms;
+                        document.getElementById('conversionRate').textContent = data.stats.conversionRate;
+                    }
+                })
+                .catch(err => console.error('Erro ao carregar estatísticas:', err));
+        }
+
+        function loadAbandonmentAnalysis() {
+            fetch('admin.php?action=getAbandonmentAnalysis')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.data.length > 0) {
+                        renderAbandonmentChart(data.data);
+                    }
+                })
+                .catch(err => console.error('Erro ao carregar análise de abandono:', err));
+        }
+
+        function renderAbandonmentChart(data) {
+            const container = document.getElementById('abandonmentChart');
+            const maxCount = Math.max(...data.map(d => d.count));
+            
+            let html = '<div style="padding: 20px;">';
+            data.forEach(item => {
+                const percentage = (item.count / maxCount) * 100;
+                const barColor = percentage > 70 ? '#ef4444' : percentage > 40 ? '#f59e0b' : '#3b82f6';
+                
+                html += `
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="font-weight: 600; color: #1f2937;">${item.ultimo_campo || 'Campo desconhecido'}</span>
+                            <span style="color: #6b7280;">${item.count} abandonos</span>
+                        </div>
+                        <div style="background: #e5e7eb; height: 24px; border-radius: 12px; overflow: hidden;">
+                            <div style="background: ${barColor}; height: 100%; width: ${percentage}%; transition: width 0.5s ease;"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        function loadInteractions() {
+            const period = document.getElementById('filterPeriod').value;
+            const device = document.getElementById('filterDevice').value;
+            const name = document.getElementById('filterName').value;
+
+            const params = new URLSearchParams({
+                action: 'getInteractionSessions',
+                period: period,
+                device: device,
+                name: name
+            });
+
+            const container = document.getElementById('sessionsContainer');
+            container.innerHTML = '<p>Carregando sessões...</p>';
+
+            fetch(`admin.php?${params}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.sessions.length > 0) {
+                        renderSessions(data.sessions);
+                    } else {
+                        container.innerHTML = '<p style="text-align: center; color: #6b7280;">Nenhuma sessão encontrada com os filtros aplicados.</p>';
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar sessões:', err);
+                    container.innerHTML = '<p style="color: #ef4444;">Erro ao carregar sessões.</p>';
+                });
+        }
+
+        function renderSessions(sessions) {
+            const container = document.getElementById('sessionsContainer');
+            
+            let html = '';
+            sessions.forEach(session => {
+                const status = session.completed ? 'completed' : 'abandoned';
+                const statusText = session.completed ? 'Completo' : 'Abandonado';
+                const statusIcon = session.completed ? 'fa-check-circle' : 'fa-times-circle';
+                
+                const firstTime = new Date(session.first_interaction).toLocaleString('pt-BR');
+                const lastTime = new Date(session.last_interaction).toLocaleString('pt-BR');
+                
+                const deviceIcon = session.device === 'Mobile' ? 'fa-mobile-alt' : 
+                                  session.device === 'Tablet' ? 'fa-tablet-alt' : 'fa-desktop';
+                
+                html += `
+                    <div class="session-card ${status}">
+                        <div class="session-header">
+                            <div>
+                                <strong>${session.nome_completo || 'Nome não informado'}</strong>
+                                <span class="session-badge ${status}">
+                                    <i class="fas ${statusIcon}"></i> ${statusText}
+                                </span>
+                            </div>
+                            <button class="btn-expand" onclick="toggleSessionDetails('${session.session_id}', this)">
+                                <i class="fas fa-chevron-down"></i> Ver Detalhes
+                            </button>
+                        </div>
+                        <div class="session-info">
+                            <div class="session-info-item">
+                                <i class="fas fa-network-wired"></i>
+                                <span>IP: ${session.ip}</span>
+                            </div>
+                            <div class="session-info-item">
+                                <i class="fas ${deviceIcon}"></i>
+                                <span>${session.device} - ${session.os}</span>
+                            </div>
+                            <div class="session-info-item">
+                                <i class="fas fa-browser"></i>
+                                <span>${session.browser}</span>
+                            </div>
+                            <div class="session-info-item">
+                                <i class="fas fa-clock"></i>
+                                <span>${firstTime}</span>
+                            </div>
+                            <div class="session-info-item">
+                                <i class="fas fa-mouse-pointer"></i>
+                                <span>${session.interaction_count} interações</span>
+                            </div>
+                        </div>
+                        ${!session.completed ? `
+                            <div style="margin-top: 10px; padding: 10px; background: #fef3c7; border-radius: 6px; font-size: 0.9rem;">
+                                <i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i>
+                                <strong>Último campo interagido:</strong> ${session.ultimo_campo || 'Desconhecido'}
+                            </div>
+                        ` : ''}
+                        <div class="session-timeline" id="timeline-${session.session_id}" style="display: none;">
+                            <p style="text-align: center; color: #6b7280;">Carregando timeline...</p>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function toggleSessionDetails(sessionId, button) {
+            const timeline = document.getElementById('timeline-' + sessionId);
+            const icon = button.querySelector('i');
+            
+            if (timeline.style.display === 'none') {
+                // Expandir
+                timeline.style.display = 'block';
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+                button.innerHTML = '<i class="fas fa-chevron-up"></i> Ocultar Detalhes';
+                
+                // Carregar detalhes se ainda não foram carregados
+                if (timeline.innerHTML.includes('Carregando')) {
+                    loadSessionDetails(sessionId);
+                }
+            } else {
+                // Recolher
+                timeline.style.display = 'none';
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+                button.innerHTML = '<i class="fas fa-chevron-down"></i> Ver Detalhes';
+            }
+        }
+
+        function loadSessionDetails(sessionId) {
+            fetch(`admin.php?action=getSessionDetails&session_id=${sessionId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.interactions.length > 0) {
+                        renderTimeline(sessionId, data.interactions);
+                    } else {
+                        document.getElementById('timeline-' + sessionId).innerHTML = 
+                            '<p style="text-align: center; color: #6b7280;">Nenhuma interação detalhada encontrada.</p>';
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar detalhes da sessão:', err);
+                    document.getElementById('timeline-' + sessionId).innerHTML = 
+                        '<p style="color: #ef4444;">Erro ao carregar detalhes.</p>';
+                });
+        }
+
+        function renderTimeline(sessionId, interactions) {
+            const timeline = document.getElementById('timeline-' + sessionId);
+            
+            const actionLabels = {
+                'focus': 'Focou em',
+                'blur': 'Saiu de',
+                'change': 'Alterou',
+                'select': 'Selecionou',
+                'check': 'Marcou',
+                'file_selected': 'Selecionou arquivo em'
+            };
+            
+            let html = '<h5 style="margin-top: 0; color: #1f2937;"><i class="fas fa-history"></i> Timeline de Interações</h5>';
+            
+            interactions.forEach(interaction => {
+                const time = new Date(interaction.timestamp).toLocaleTimeString('pt-BR');
+                const action = actionLabels[interaction.acao] || interaction.acao;
+                
+                html += `
+                    <div class="timeline-item">
+                        <span class="timeline-time">${time}</span>
+                        <span class="timeline-action">${action}</span>
+                        <span class="timeline-field">${interaction.ultimo_campo || 'campo desconhecido'}</span>
+                    </div>
+                `;
+            });
+            
+            timeline.innerHTML = html;
         }
 
         // Carregamento inicial

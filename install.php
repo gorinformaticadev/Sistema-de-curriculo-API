@@ -2,6 +2,7 @@
 // Interactive installer for the system with modern design
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $installMode = $_POST['install_mode'] ?? 'install'; // 'install' ou 'update'
     $dbName = trim($_POST['db_name'] ?? '');
     $dbUser = trim($_POST['db_user'] ?? 'root');
     $dbPass = trim($_POST['db_pass'] ?? '');
@@ -13,11 +14,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$dbName) {
         $errors[] = "Nome do banco de dados é obrigatório.";
     }
-    if (!$adminEmail) {
-        $errors[] = "Email do usuário admin é obrigatório.";
-    }
-    if (!$adminPass) {
-        $errors[] = "Senha do usuário admin é obrigatória.";
+    
+    // Validações específicas para instalação completa
+    if ($installMode === 'install') {
+        if (!$adminEmail) {
+            $errors[] = "Email do usuário admin é obrigatório.";
+        }
+        if (!$adminPass) {
+            $errors[] = "Senha do usuário admin é obrigatória.";
+        }
     }
 
     if (count($errors) === 0) {
@@ -27,11 +32,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $steps = [];
 
-            // Create database
-            $pdo_init->exec("CREATE DATABASE IF NOT EXISTS `$dbName` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
-            $steps[] = "Banco de dados '$dbName' verificado/criado com sucesso.";
+            if ($installMode === 'install') {
+                // Create database
+                $pdo_init->exec("CREATE DATABASE IF NOT EXISTS `$dbName` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
+                $steps[] = "Banco de dados '$dbName' verificado/criado com sucesso.";
+            } else {
+                $steps[] = "Modo de atualização: usando banco de dados existente '$dbName'.";
+            }
 
-            // Connect to new database
+            // Connect to database
             $pdo = new PDO("mysql:host=localhost;dbname=$dbName", $dbUser, $dbPass);
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
@@ -88,16 +97,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->exec($sql_curriculos);
             $steps[] = "Tabela 'curriculos' verificada/criada com sucesso.";
 
-            // Insert admin user if not exists
-            $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE email = ?");
-            $stmt->execute([$adminEmail]);
-            if ($stmt->rowCount() == 0) {
-                $senha_hash = password_hash($adminPass, PASSWORD_DEFAULT);
-                $stmt = $pdo->prepare("INSERT INTO usuarios (email, senha) VALUES (?, ?)");
-                $stmt->execute([$adminEmail, $senha_hash]);
-                $steps[] = "Usuário administrador '$adminEmail' inserido com sucesso.";
-            } else {
-                $steps[] = "Usuário administrador '$adminEmail' já existe.";
+            // Criar tabela de interações do formulário (NOVA)
+            $sql_interactions = "
+            CREATE TABLE IF NOT EXISTS `form_interactions` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `session_id` VARCHAR(255) NOT NULL,
+                `ip` VARCHAR(45) NOT NULL,
+                `user_agent` TEXT,
+                `browser` VARCHAR(100),
+                `os` VARCHAR(100),
+                `device` VARCHAR(50),
+                `nome_completo` VARCHAR(255) DEFAULT NULL,
+                `ultimo_campo` VARCHAR(100),
+                `acao` VARCHAR(50),
+                `valor_campo` TEXT,
+                `timestamp` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX `idx_session` (`session_id`),
+                INDEX `idx_ip` (`ip`),
+                INDEX `idx_timestamp` (`timestamp`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            ";
+            $pdo->exec($sql_interactions);
+            $steps[] = "Tabela 'form_interactions' verificada/criada com sucesso.";
+
+            // Insert admin user if not exists (apenas no modo install)
+            if ($installMode === 'install' && $adminEmail && $adminPass) {
+                $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE email = ?");
+                $stmt->execute([$adminEmail]);
+                if ($stmt->rowCount() == 0) {
+                    $senha_hash = password_hash($adminPass, PASSWORD_DEFAULT);
+                    $stmt = $pdo->prepare("INSERT INTO usuarios (email, senha) VALUES (?, ?)");
+                    $stmt->execute([$adminEmail, $senha_hash]);
+                    $steps[] = "Usuário administrador '$adminEmail' inserido com sucesso.";
+                } else {
+                    $steps[] = "Usuário administrador '$adminEmail' já existe.";
+                }
+            } else if ($installMode === 'update') {
+                $steps[] = "Modo de atualização: credenciais de admin não foram alteradas.";
             }
 
             // Insert default config if not exists
@@ -289,7 +325,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     <?php endif; ?>
 <?php else: ?>
-    <form method="POST" action="install.php">
+    <form method="POST" action="install.php" id="installForm">
+        <label for="install_mode">Modo de Instalação:</label>
+        <select id="install_mode" name="install_mode" onchange="toggleAdminFields()" style="width: 100%; padding: 10px 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem;">
+            <option value="install">Nova Instalação (Criar tudo do zero)</option>
+            <option value="update">Atualizar Sistema (Manter dados existentes)</option>
+        </select>
+
         <label for="db_name">Nome do Banco de Dados:</label>
         <input type="text" id="db_name" name="db_name" required />
 
@@ -299,14 +341,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label for="db_pass">Senha do Banco de Dados:</label>
         <input type="password" id="db_pass" name="db_pass" />
 
-        <label for="admin_email">Email do Usuário Admin:</label>
-        <input type="email" id="admin_email" name="admin_email" required />
+        <div id="adminFields">
+            <label for="admin_email">Email do Usuário Admin:</label>
+            <input type="email" id="admin_email" name="admin_email" />
 
-        <label for="admin_pass">Senha do Usuário Admin:</label>
-        <input type="password" id="admin_pass" name="admin_pass" required />
+            <label for="admin_pass">Senha do Usuário Admin:</label>
+            <input type="password" id="admin_pass" name="admin_pass" />
+        </div>
 
         <button type="submit">Instalar</button>
     </form>
+
+    <script>
+        function toggleAdminFields() {
+            const mode = document.getElementById('install_mode').value;
+            const adminFields = document.getElementById('adminFields');
+            const adminEmail = document.getElementById('admin_email');
+            const adminPass = document.getElementById('admin_pass');
+            
+            if (mode === 'update') {
+                adminFields.style.display = 'none';
+                adminEmail.removeAttribute('required');
+                adminPass.removeAttribute('required');
+            } else {
+                adminFields.style.display = 'block';
+                adminEmail.setAttribute('required', 'required');
+                adminPass.setAttribute('required', 'required');
+            }
+        }
+    </script>
     <?php endif; ?>
 </div>
 </body>
