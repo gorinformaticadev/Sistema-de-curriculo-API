@@ -34,6 +34,9 @@ class FormTracker {
         
         // Enviar dados antes de sair da página
         window.addEventListener('beforeunload', () => this.sendInteractions(true));
+
+        // Exibir o timeline de interações
+        this.displayInteractionTimeline();
     }
 
     trackFormFields() {
@@ -78,10 +81,11 @@ class FormTracker {
         // Capturar nome completo quando preenchido
         const nameInput = form.querySelector('input[name="name"]');
         if (nameInput) {
-            nameInput.addEventListener('blur', (e) => {
-                if (e.target.value.trim()) {
-                    this.userName = e.target.value.trim();
-                }
+            nameInput.addEventListener('focus', (e) => {
+                this.logInteraction(e.target, 'focus');
+            });
+            nameInput.addEventListener('input', (e) => {
+                this.logInteraction(e.target, 'input');
             });
         }
     }
@@ -95,13 +99,16 @@ class FormTracker {
 
         // Obter valor do campo (sem dados sensíveis completos)
         let fieldValue = '';
-        if (action === 'change' || action === 'select' || action === 'check') {
+        if (element.name === 'name') {
+            fieldValue = element.value;
+            console.log('✅ Nome Completo capturado:', fieldValue, 'Ação:', action);
+        } else if (action === 'change' || action === 'select' || action === 'check') {
             if (element.type === 'radio' || element.type === 'checkbox') {
                 fieldValue = element.value;
             } else if (element.type === 'file') {
                 fieldValue = element.files.length > 0 ? 'arquivo_selecionado' : 'nenhum_arquivo';
             } else if (element.value) {
-                // Para campos de texto, apenas indicar que foi preenchido
+                // Para outros campos de texto, apenas indicar que foi preenchido
                 fieldValue = element.value.length > 0 ? 'preenchido' : 'vazio';
             }
         }
@@ -117,8 +124,14 @@ class FormTracker {
         };
 
         this.interactions.push(interaction);
-        
-        console.log('📝 Interação registrada:', interaction);
+
+        // Formatar a mensagem de log
+        let logMessage = `📝 ${new Date().toLocaleTimeString()} ${action} ${fieldLabel}`;
+        if (fieldValue) {
+            logMessage += ` Valor: ${fieldValue}`;
+        }
+
+        console.log(logMessage);
     }
 
     getFieldLabel(element) {
@@ -183,6 +196,12 @@ class FormTracker {
                     },
                     body: JSON.stringify(dataToSend)
                 });
+                
+                // Reiniciar sessão se a página perder o foco
+                window.addEventListener('blur', function() {
+                    sessionStorage.removeItem('form_session_id');
+                    console.log('🔄 Sessão reiniciada devido à perda de foco.');
+                });
 
                 if (response.ok) {
                     const result = await response.json();
@@ -194,6 +213,51 @@ class FormTracker {
         } catch (error) {
             console.error('❌ Erro ao enviar interações:', error);
         }
+    }
+
+    displayInteractionTimeline() {
+        // Criar o elemento para o timeline
+        const timelineDiv = document.createElement('div');
+        timelineDiv.id = 'interactionTimeline';
+        timelineDiv.style.cssText = `
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 300px;
+            height: 100%;
+            background-color: #f0f0f0;
+            padding: 10px;
+            overflow-y: auto;
+            z-index: 1000;
+            font-size: 12px;
+        `;
+
+        // Adicionar um título ao timeline
+        const title = document.createElement('h3');
+        title.textContent = 'Timeline de Interações';
+        timelineDiv.appendChild(title);
+
+        // Adicionar as interações ao timeline
+        this.interactions.forEach(interaction => {
+            const interactionDiv = document.createElement('div');
+            interactionDiv.style.marginBottom = '5px';
+
+            let interactionText = `${new Date(interaction.timestamp).toLocaleTimeString()} - ${interaction.action} - `;
+            if (interaction.fieldName === 'name') {
+                interactionText += `${interaction.fieldValue}`;
+            } else {
+                interactionText += `${interaction.fieldLabel || interaction.fieldName}`;
+            }
+            if (interaction.fieldValue) {
+                interactionText += ` - ${interaction.fieldValue}`;
+            }
+
+            interactionDiv.textContent = interactionText
+            timelineDiv.appendChild(interactionDiv);
+        });
+
+        // Adicionar o timeline ao body da página
+        document.body.appendChild(timelineDiv);
     }
 }
 
