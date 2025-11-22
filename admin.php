@@ -8,10 +8,17 @@ require_once 'db_connect.php';
 
 // Função para log de erros (pode ser movida para um arquivo de helpers no futuro)
 function logError($message, $type = 'ERROR') {
+    $logFile = 'error.log';
+    $maxSize = 5 * 1024 * 1024; // 5MB
+
+    if (file_exists($logFile) && filesize($logFile) > $maxSize) {
+        rename($logFile, $logFile . '.bak');
+    }
+
     $timestamp = date('Y-m-d H:i:s');
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $logMessage = "[$timestamp] [$type] [IP: $ip] $message" . PHP_EOL;
-    file_put_contents('error.log', $logMessage, FILE_APPEND | LOCK_EX);
+    file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
 }
 
 // Carregar configuração do banco de dados
@@ -1780,11 +1787,14 @@ $totalCurriculos = $stmt->fetchColumn();
                 const time = new Date(interaction.timestamp).toLocaleTimeString('pt-BR');
                 const action = actionLabels[interaction.acao] || interaction.acao;
                 
+                const valueDisplay = interaction.valor_campo ? ` <span style="color: #2563eb; font-weight: 600;">"${interaction.valor_campo}"</span>` : '';
+                
                 html += `
                     <div class="timeline-item">
                         <span class="timeline-time">${time}</span>
                         <span class="timeline-action">${action}</span>
                         <span class="timeline-field">${interaction.ultimo_campo || 'campo desconhecido'}</span>
+                        ${valueDisplay}
                     </div>
                 `;
             });

@@ -29,10 +29,20 @@ try {
     // Como este arquivo é incluído, vamos definir uma função de log de emergência aqui.
     if (!function_exists('logError')) {
         function logError($message, $type = 'ERROR') {
+            $logFile = 'error.log';
+            $maxSize = 5 * 1024 * 1024; // 5MB
+
+            // Rotação de logs
+            if (file_exists($logFile) && filesize($logFile) > $maxSize) {
+                $backupFile = $logFile . '.bak';
+                // Se já existir um backup, ele será sobrescrito
+                rename($logFile, $backupFile);
+            }
+
             $timestamp = date('Y-m-d H:i:s');
             $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
             $logMessage = "[$timestamp] [$type] [IP: $ip] $message" . PHP_EOL;
-            file_put_contents('error.log', $logMessage, FILE_APPEND | LOCK_EX);
+            file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
         }
     }
     logError('DB_CONNECT_FAILURE: Falha na conexão com o banco de dados: ' . $e->getMessage());

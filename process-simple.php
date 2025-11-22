@@ -10,10 +10,17 @@ ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
 function logError($message, $type = 'ERROR') {
+    $logFile = 'error.log';
+    $maxSize = 5 * 1024 * 1024; // 5MB
+
+    if (file_exists($logFile) && filesize($logFile) > $maxSize) {
+        rename($logFile, $logFile . '.bak');
+    }
+
     $timestamp = date('Y-m-d H:i:s');
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $logMessage = "[$timestamp] [$type] [IP: $ip] $message" . PHP_EOL;
-    file_put_contents('error.log', $logMessage, FILE_APPEND | LOCK_EX);
+    file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
 }
 
 // Carregar configuração do banco de dados

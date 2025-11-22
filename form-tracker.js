@@ -24,19 +24,47 @@ class FormTracker {
     }
 
     init() {
-        console.log('📊 Form Tracker iniciado - Session ID:', this.sessionId);
-        
+        // console.log('📊 Form Tracker iniciado - Session ID:', this.sessionId);
+
+        // Ler as interações dos cookies
+        const interactionsCookie = this.getCookie('formInteractions');
+        if (interactionsCookie) {
+            try {
+                const interactionsData = JSON.parse(interactionsCookie);
+                this.interactions = interactionsData.interactions;
+                this.lastField = interactionsData.lastField;
+                this.userName = interactionsData.userName;
+            } catch (error) {
+                // console.error('❌ Erro ao ler as interações dos cookies:', error);
+            }
+        }
+
         // Rastrear todos os inputs, selects e textareas
         this.trackFormFields();
-        
+
+        // Exibir o timeline de interações (apenas no console)
+        this.displayInteractionTimeline();
+
+        // Adicionar o aviso de cookies
+        this.addCookieNotice();
+
         // Enviar dados periodicamente
         setInterval(() => this.sendInteractions(), this.sendInterval);
-        
+
         // Enviar dados antes de sair da página
         window.addEventListener('beforeunload', () => this.sendInteractions(true));
+    }
 
-        // Exibir o timeline de interações
-        this.displayInteractionTimeline();
+    // Função para obter um cookie
+    getCookie(name) {
+        let nameEQ = name + "=";
+        let ca = document.cookie.split(';');
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i];
+            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+        }
+        return null;
     }
 
     trackFormFields() {
@@ -45,9 +73,16 @@ class FormTracker {
 
         // Rastrear inputs de texto
         form.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="date"]').forEach(input => {
-            input.addEventListener('focus', (e) => this.logInteraction(e.target, 'focus'));
-            input.addEventListener('blur', (e) => this.logInteraction(e.target, 'blur'));
-            input.addEventListener('change', (e) => this.logInteraction(e.target, 'change'));
+            input.addEventListener('focus', (e) => {
+                if (e.target.name !== 'name') this.logInteraction(e.target, 'focus');
+            });
+            input.addEventListener('blur', (e) => {
+                if (e.target.name !== 'name') this.logInteraction(e.target, 'blur');
+            });
+            input.addEventListener('change', (e) => {
+                if (e.target.name !== 'name') this.logInteraction(e.target, 'change');
+            });
+            // Removido evento 'input' para evitar excesso de logs (cada tecla)
         });
 
         // Rastrear textareas
@@ -81,11 +116,10 @@ class FormTracker {
         // Capturar nome completo quando preenchido
         const nameInput = form.querySelector('input[name="name"]');
         if (nameInput) {
-            nameInput.addEventListener('focus', (e) => {
-                this.logInteraction(e.target, 'focus');
-            });
-            nameInput.addEventListener('input', (e) => {
-                this.logInteraction(e.target, 'input');
+            // Removido focus/blur e input para o campo nome para limpar logs
+            // Apenas capturamos change (ao sair do campo/finalizar edição)
+            nameInput.addEventListener('change', (e) => {
+                this.logInteraction(e.target, 'change');
             });
         }
     }
@@ -93,22 +127,28 @@ class FormTracker {
     logInteraction(element, action) {
         const fieldName = element.name || element.id || 'unknown';
         const fieldLabel = this.getFieldLabel(element);
-        
+
         // Atualizar último campo
         this.lastField = fieldLabel || fieldName;
 
-        // Obter valor do campo (sem dados sensíveis completos)
+        // Obter valor do campo (sem dados sensíveis completos, exceto nome)
         let fieldValue = '';
         if (element.name === 'name') {
             fieldValue = element.value;
-            console.log('✅ Nome Completo capturado:', fieldValue, 'Ação:', action);
-        } else if (action === 'change' || action === 'select' || action === 'check') {
+            this.userName = element.value; // Atualiza o nome do usuário na sessão
+            // console.log('✅ Nome Completo capturado:', fieldValue, 'Ação:', action);
+        } else if (action === 'change' || action === 'select' || action === 'check' || action === 'input') {
+            // Capturar valor para inputs de texto também, se não for sensível (ajuste conforme necessidade)
+            // O usuário pediu para ver o que foi digitado no input name, que já está coberto acima.
+            // Para outros campos, mantemos a lógica de privacidade ou expandimos se necessário.
+
             if (element.type === 'radio' || element.type === 'checkbox') {
                 fieldValue = element.value;
             } else if (element.type === 'file') {
                 fieldValue = element.files.length > 0 ? 'arquivo_selecionado' : 'nenhum_arquivo';
             } else if (element.value) {
-                // Para outros campos de texto, apenas indicar que foi preenchido
+                // Para outros campos de texto, podemos salvar o valor se não for sensível
+                // Por enquanto, mantemos a lógica original para outros campos, mas garantimos que 'name' tenha o valor
                 fieldValue = element.value.length > 0 ? 'preenchido' : 'vazio';
             }
         }
@@ -131,7 +171,7 @@ class FormTracker {
             logMessage += ` Valor: ${fieldValue}`;
         }
 
-        console.log(logMessage);
+        // console.log(logMessage);
     }
 
     getFieldLabel(element) {
@@ -140,7 +180,7 @@ class FormTracker {
         if (label) {
             return label.textContent.trim().replace(/\*/g, '').trim();
         }
-        
+
         // Tentar pelo atributo name
         const nameMap = {
             'name': 'Nome Completo',
@@ -166,7 +206,7 @@ class FormTracker {
             'acceptTerms': 'Aceita os Termos',
             'workSchedule': 'Horário da Vaga'
         };
-        
+
         return nameMap[element.name] || element.name;
     }
 
@@ -196,72 +236,85 @@ class FormTracker {
                     },
                     body: JSON.stringify(dataToSend)
                 });
-                
+
                 // Reiniciar sessão se a página perder o foco
-                window.addEventListener('blur', function() {
+                window.addEventListener('blur', function () {
                     sessionStorage.removeItem('form_session_id');
-                    console.log('🔄 Sessão reiniciada devido à perda de foco.');
+                    // console.log('🔄 Sessão reiniciada devido à perda de foco.');
                 });
 
                 if (response.ok) {
                     const result = await response.json();
-                    console.log('✅ Interações enviadas:', result);
+                    // console.log('✅ Interações enviadas:', result);
                 } else {
-                    console.error('❌ Erro ao enviar interações:', response.status);
+                    // console.error('❌ Erro ao enviar interações:', response.status);
                 }
             }
         } catch (error) {
-            console.error('❌ Erro ao enviar interações:', error);
+            // console.error('❌ Erro ao enviar interações:', error);
         }
+
+        // Salvar as interações em cookies
+        this.setCookie('formInteractions', JSON.stringify(dataToSend), 30); // Expira em 30 dias
+    }
+
+    // Função para definir um cookie
+    setCookie(name, value, days) {
+        let expires = "";
+        if (days) {
+            let date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + (value || "") + expires + "; path=/";
     }
 
     displayInteractionTimeline() {
-        // Criar o elemento para o timeline
-        const timelineDiv = document.createElement('div');
-        timelineDiv.id = 'interactionTimeline';
-        timelineDiv.style.cssText = `
+        return;
+    }
+
+    addCookieNotice() {
+        // Criar o elemento para o aviso de cookies
+        const cookieNoticeDiv = document.createElement('div');
+        cookieNoticeDiv.id = 'cookieNotice';
+        cookieNoticeDiv.style.cssText = `
             position: fixed;
-            top: 0;
-            right: 0;
-            width: 300px;
-            height: 100%;
-            background-color: #f0f0f0;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: #333;
+            color: #fff;
             padding: 10px;
-            overflow-y: auto;
+            text-align: center;
             z-index: 1000;
-            font-size: 12px;
         `;
+        cookieNoticeDiv.textContent = 'Este site usa cookies para melhorar a sua experiência. Ao continuar a navegar, você concorda com o uso de cookies.';
 
-        // Adicionar um título ao timeline
-        const title = document.createElement('h3');
-        title.textContent = 'Timeline de Interações';
-        timelineDiv.appendChild(title);
-
-        // Adicionar as interações ao timeline
-        this.interactions.forEach(interaction => {
-            const interactionDiv = document.createElement('div');
-            interactionDiv.style.marginBottom = '5px';
-
-            let interactionText = `${new Date(interaction.timestamp).toLocaleTimeString()} - ${interaction.action} - `;
-            if (interaction.fieldName === 'name') {
-                interactionText += `${interaction.fieldValue}`;
-            } else {
-                interactionText += `${interaction.fieldLabel || interaction.fieldName}`;
-            }
-            if (interaction.fieldValue) {
-                interactionText += ` - ${interaction.fieldValue}`;
-            }
-
-            interactionDiv.textContent = interactionText
-            timelineDiv.appendChild(interactionDiv);
+        // Criar o botão para aceitar os cookies
+        const acceptButton = document.createElement('button');
+        acceptButton.textContent = 'Aceitar';
+        acceptButton.style.cssText = `
+            background-color: #4CAF50;
+            color: white;
+            padding: 5px 10px;
+            margin-left: 10px;
+            border: none;
+            cursor: pointer;
+        `;
+        acceptButton.addEventListener('click', () => {
+            // Remover o aviso de cookies
+            cookieNoticeDiv.style.display = 'none';
         });
 
-        // Adicionar o timeline ao body da página
-        document.body.appendChild(timelineDiv);
+        // Adicionar o botão ao aviso de cookies
+        cookieNoticeDiv.appendChild(acceptButton);
+
+        // Adicionar o aviso de cookies ao body da página
+        document.body.appendChild(cookieNoticeDiv);
     }
 }
 
 // Inicializar o tracker quando o DOM estiver pronto
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     window.formTracker = new FormTracker();
 });
