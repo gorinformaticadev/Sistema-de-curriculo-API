@@ -71,49 +71,55 @@ class FormTracker {
         const form = document.getElementById('curriculumForm');
         if (!form) return;
 
-        // Rastrear inputs de texto
+        // Rastrear inputs de texto - usar BLUR para garantir captura quando sair do campo
         form.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="date"]').forEach(input => {
-            input.addEventListener('change', (e) => {
-                if (e.target.name !== 'name') this.logInteraction(e.target, 'change');
+            // Usar blur ao invés de change para garantir que capture quando o usuário sair do campo
+            input.addEventListener('blur', (e) => {
+                // Só registrar se tiver valor
+                if (e.target.value && e.target.value.trim() !== '') {
+                    this.logInteraction(e.target, 'change');
+                }
             });
-            // Removido evento 'input' para evitar excesso de logs (cada tecla)
-            // Removidos eventos 'focus' e 'blur' para limpar logs
         });
 
-        // Rastrear textareas
+        // Rastrear textareas - usar BLUR
         form.querySelectorAll('textarea').forEach(textarea => {
-            textarea.addEventListener('change', (e) => this.logInteraction(e.target, 'change'));
-        });
-
-        // Rastrear selects
-        form.querySelectorAll('select').forEach(select => {
-            select.addEventListener('change', (e) => this.logInteraction(e.target, 'change'));
-        });
-
-        // Rastrear radio buttons
-        form.querySelectorAll('input[type="radio"]').forEach(radio => {
-            radio.addEventListener('change', (e) => this.logInteraction(e.target, 'select'));
-        });
-
-        // Rastrear checkboxes
-        form.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-            checkbox.addEventListener('change', (e) => this.logInteraction(e.target, 'check'));
-        });
-
-        // Rastrear file inputs
-        form.querySelectorAll('input[type="file"]').forEach(fileInput => {
-            fileInput.addEventListener('change', (e) => this.logInteraction(e.target, 'file_selected'));
-        });
-
-        // Capturar nome completo quando preenchido
-        const nameInput = form.querySelector('input[name="name"]');
-        if (nameInput) {
-            // Removido focus/blur e input para o campo nome para limpar logs
-            // Apenas capturamos change (ao sair do campo/finalizar edição)
-            nameInput.addEventListener('change', (e) => {
-                this.logInteraction(e.target, 'change');
+            textarea.addEventListener('blur', (e) => {
+                if (e.target.value && e.target.value.trim() !== '') {
+                    this.logInteraction(e.target, 'change');
+                }
             });
-        }
+        });
+
+        // Rastrear selects - usar CHANGE (funciona bem para selects)
+        form.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    this.logInteraction(e.target, 'change');
+                }
+            });
+        });
+
+        // Rastrear radio buttons - usar CHANGE
+        form.querySelectorAll('input[type="radio"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                this.logInteraction(e.target, 'select');
+            });
+        });
+
+        // Rastrear checkboxes - usar CHANGE
+        form.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                this.logInteraction(e.target, 'check');
+            });
+        });
+
+        // Rastrear file inputs - usar CHANGE
+        form.querySelectorAll('input[type="file"]').forEach(fileInput => {
+            fileInput.addEventListener('change', (e) => {
+                this.logInteraction(e.target, 'file_selected');
+            });
+        });
 
         // Rastrear botão de finalizar cadastro
         const submitBtn = form.querySelector('button[type="submit"]');
