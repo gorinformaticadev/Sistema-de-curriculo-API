@@ -943,23 +943,61 @@ $totalCurriculos = $stmt->fetchColumn();
             margin-top: 15px;
             padding-top: 15px;
             border-top: 1px solid #e5e7eb;
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
         }
         .timeline-item {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 8px;
-            font-size: 0.85rem;
+            margin-bottom: 15px;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            transition: all 0.3s ease;
+        }
+        .timeline-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-color: #3b82f6;
         }
         .timeline-time {
-            color: #9ca3af;
-            min-width: 80px;
+            background: #f3f4f6;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: #6b7280;
+            font-family: 'Courier New', monospace;
         }
         .timeline-action {
-            color: #4b5563;
-        }
-        .timeline-field {
             font-weight: 600;
             color: #1f2937;
+            font-size: 0.95rem;
+        }
+        .timeline-field {
+            color: #4b5563;
+            font-size: 0.95rem;
+        }
+        .timeline-value-box {
+            margin-top: 8px;
+            padding: 10px;
+            background: #f0fdf4;
+            border-left: 3px solid #22c55e;
+            border-radius: 4px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .timeline-value-box strong {
+            color: #15803d;
+            font-size: 0.9rem;
+        }
+        .timeline-value-box span {
+            color: #166534;
+            font-weight: 500;
+        }
+        .timeline-file-box {
+            margin-top: 8px;
+            padding: 10px;
+            background: #dbeafe;
+            border-left: 3px solid #3b82f6;
+            border-radius: 4px;
         }
         .btn-expand {
             background: transparent;
@@ -1837,33 +1875,64 @@ $totalCurriculos = $stmt->fetchColumn();
             const timeline = document.getElementById('timeline-' + sessionId);
             
             const actionLabels = {
-                'focus': 'Focou em',
-                'blur': 'Saiu de',
-                'change': 'Alterou',
-                'select': 'Selecionou',
-                'check': 'Marcou',
-                'file_selected': 'Selecionou arquivo em'
+                'focus': '👁️ Focou em',
+                'blur': '👋 Saiu de',
+                'change': '✏️ Alterou',
+                'select': '✅ Selecionou',
+                'check': '☑️ Marcou',
+                'file_selected': '📎 Anexou arquivo em'
             };
             
             let html = '<h5 style="margin-top: 0; color: #1f2937;"><i class="fas fa-history"></i> Timeline de Interações</h5>';
+            html += '<div style="background: #f9fafb; padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 0.85rem; color: #6b7280;">';
+            html += '<i class="fas fa-info-circle"></i> Mostrando todos os valores digitados e selecionados pelo usuário';
+            html += '</div>';
             
             interactions.forEach(interaction => {
                 const time = new Date(interaction.timestamp).toLocaleTimeString('pt-BR');
                 const action = actionLabels[interaction.acao] || interaction.acao;
+                const fieldName = interaction.ultimo_campo || 'campo desconhecido';
                 
-                const valueDisplay = interaction.valor_campo ? ` <span style="color: #2563eb; font-weight: 600;">"${interaction.valor_campo}"</span>` : '';
+                // Formatar o valor do campo de forma mais destacada
+                let valueDisplay = '';
+                if (interaction.valor_campo) {
+                    const value = interaction.valor_campo;
+                    
+                    // Verificar se é um arquivo anexado
+                    if (value.includes('Arquivo anexado:')) {
+                        valueDisplay = `<div style="margin-top: 5px; padding: 8px; background: #dbeafe; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 0.9rem;">
+                            <i class="fas fa-paperclip"></i> ${value}
+                        </div>`;
+                    } else {
+                        // Valor normal - destacar em um box
+                        valueDisplay = `<div style="margin-top: 5px; padding: 8px; background: #f0fdf4; border-left: 3px solid #22c55e; border-radius: 4px;">
+                            <strong style="color: #15803d;">Valor:</strong> <span style="color: #166534; font-weight: 500;">${escapeHtml(value)}</span>
+                        </div>`;
+                    }
+                }
                 
                 html += `
-                    <div class="timeline-item">
-                        <span class="timeline-time">${time}</span>
-                        <span class="timeline-action">${action}</span>
-                        <span class="timeline-field">${interaction.ultimo_campo || 'campo desconhecido'}</span>
-                        ${valueDisplay}
+                    <div class="timeline-item" style="margin-bottom: 15px; padding: 12px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                            <span class="timeline-time" style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; color: #6b7280;">${time}</span>
+                            <span class="timeline-action" style="font-weight: 600; color: #1f2937;">${action}</span>
+                        </div>
+                        <div style="margin-left: 10px;">
+                            <span class="timeline-field" style="color: #4b5563; font-size: 0.95rem;">📋 ${fieldName}</span>
+                            ${valueDisplay}
+                        </div>
                     </div>
                 `;
             });
             
             timeline.innerHTML = html;
+        }
+        
+        // Função auxiliar para escapar HTML e prevenir XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         // Carregamento inicial

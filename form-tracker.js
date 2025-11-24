@@ -131,26 +131,36 @@ class FormTracker {
         // Atualizar último campo
         this.lastField = fieldLabel || fieldName;
 
-        // Obter valor do campo (sem dados sensíveis completos, exceto nome)
+        // Obter valor REAL do campo
         let fieldValue = '';
-        if (element.name === 'name') {
-            fieldValue = element.value;
-            this.userName = element.value; // Atualiza o nome do usuário na sessão
-            // console.log('✅ Nome Completo capturado:', fieldValue, 'Ação:', action);
-        } else if (action === 'change' || action === 'select' || action === 'check' || action === 'input') {
-            // Capturar valor para inputs de texto também, se não for sensível (ajuste conforme necessidade)
-            // O usuário pediu para ver o que foi digitado no input name, que já está coberto acima.
-            // Para outros campos, mantemos a lógica de privacidade ou expandimos se necessário.
-
-            if (element.type === 'radio' || element.type === 'checkbox') {
-                fieldValue = element.value;
-            } else if (element.type === 'file') {
-                fieldValue = element.files.length > 0 ? 'arquivo_selecionado' : 'nenhum_arquivo';
-            } else if (element.value) {
-                // Para outros campos de texto, podemos salvar o valor se não for sensível
-                // Por enquanto, mantemos a lógica original para outros campos, mas garantimos que 'name' tenha o valor
-                fieldValue = element.value.length > 0 ? 'preenchido' : 'vazio';
+        
+        if (element.type === 'file') {
+            // Para arquivos, apenas indicar que foi anexado
+            if (element.files.length > 0) {
+                const file = element.files[0];
+                fieldValue = `Arquivo anexado: ${file.name} (${(file.size / 1024).toFixed(1)}KB)`;
+            } else {
+                fieldValue = 'Nenhum arquivo selecionado';
             }
+        } else if (element.type === 'radio' || element.type === 'checkbox') {
+            // Para radio e checkbox, capturar o valor selecionado
+            if (element.checked) {
+                fieldValue = element.value;
+            }
+        } else if (element.tagName === 'SELECT') {
+            // Para selects, capturar o texto da opção selecionada
+            fieldValue = element.options[element.selectedIndex]?.text || element.value;
+        } else if (element.tagName === 'TEXTAREA' || element.type === 'text' || element.type === 'email' || element.type === 'tel' || element.type === 'date') {
+            // Para todos os outros campos de texto, capturar o valor real
+            fieldValue = element.value || '';
+        } else {
+            // Fallback para outros tipos
+            fieldValue = element.value || '';
+        }
+
+        // Atualizar nome do usuário se for o campo de nome
+        if (element.name === 'name' && fieldValue) {
+            this.userName = fieldValue;
         }
 
         const interaction = {
@@ -166,12 +176,14 @@ class FormTracker {
         this.interactions.push(interaction);
 
         // Formatar a mensagem de log
-        let logMessage = `📝 ${new Date().toLocaleTimeString()} ${action} ${fieldLabel}`;
+        let logMessage = `📝 ${new Date().toLocaleTimeString()} - ${action.toUpperCase()} - ${fieldLabel}`;
         if (fieldValue) {
-            logMessage += ` Valor: ${fieldValue}`;
+            // Limitar tamanho do valor no log do console para não poluir
+            const displayValue = fieldValue.length > 50 ? fieldValue.substring(0, 50) + '...' : fieldValue;
+            logMessage += ` → ${displayValue}`;
         }
 
-        // console.log(logMessage);
+        console.log(logMessage);
     }
 
     getFieldLabel(element) {
