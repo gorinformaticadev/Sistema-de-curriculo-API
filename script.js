@@ -456,16 +456,37 @@ function handleCurriculumSubmit(e) {
     
     console.log('🚀 Enviando dados para process-simple.php...');
     
+    // Determinar o caminho correto do arquivo PHP
+    const phpPath = window.location.pathname.includes('/') 
+        ? window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1) + 'process-simple.php'
+        : 'process-simple.php';
+    
+    console.log('📍 Caminho do PHP:', phpPath);
+    
+    // Criar um timeout manual para a requisição
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 segundos (2 minutos)
+    
     // Send to PHP
-    fetch('process-simple.php', {
+    fetch(phpPath, {
         method: 'POST',
-        body: formData
+        body: formData,
+        signal: controller.signal,
+        // Adicionar headers para melhor compatibilidade
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
     })
     .then(response => {
+        clearTimeout(timeoutId);
         console.log('📡 Resposta recebida:', response.status, response.statusText);
         
         if (!response.ok) {
-            throw new Error(`Erro HTTP: ${response.status} ${response.statusText}`);
+            // Tentar obter mais detalhes do erro
+            return response.text().then(text => {
+                console.error('📄 Resposta de erro:', text);
+                throw new Error(`Erro HTTP ${response.status}: ${response.statusText}. Detalhes: ${text.substring(0, 200)}`);
+            });
         }
         
         return response.text().then(text => {
@@ -476,7 +497,7 @@ function handleCurriculumSubmit(e) {
             } catch (e) {
                 console.error('❌ Erro ao parsear JSON:', e);
                 console.error('📄 Conteúdo recebido:', text);
-                throw new Error('Resposta inválida do servidor: ' + text.substring(0, 100));
+                throw new Error('Resposta inválida do servidor. O servidor pode estar retornando HTML ao invés de JSON. Verifique se o arquivo process-simple.php existe e está configurado corretamente.');
             }
         });
     })
@@ -494,15 +515,42 @@ function handleCurriculumSubmit(e) {
             console.log('🎉 Currículo enviado com sucesso!');
         } else {
             console.error('❌ Erro retornado pelo servidor:', data.message);
-            alert('❌ Erro ao enviar currículo: ' + data.message);
+            alert('❌ Erro ao enviar currículo: ' + data.message + '\n\nSe o problema persistir, entre em contato pelo WhatsApp (61) 3359-7358.');
         }
     })
     .catch(error => {
+        clearTimeout(timeoutId);
         console.error('💥 Erro crítico na requisição fetch:', error);
         
-        let errorMessage = 'Erro ao enviar currículo. Causa: ' + error.message;
+        let errorMessage = '';
+        let userMessage = '';
         
-        alert('❌ ' + errorMessage + '\n\nVerifique sua conexão com a internet ou entre em contato com o suporte.');
+        // Identificar o tipo de erro
+        if (error.name === 'AbortError') {
+            errorMessage = 'Tempo limite excedido (timeout)';
+            userMessage = '⏱️ O envio está demorando muito. Isso pode acontecer se:\n\n' +
+                         '• Sua conexão está lenta\n' +
+                         '• Os arquivos são muito grandes\n' +
+                         '• O servidor está sobrecarregado\n\n' +
+                         'Tente novamente com uma conexão melhor ou arquivos menores.';
+        } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+            errorMessage = 'Falha na conexão de rede';
+            userMessage = '🌐 Não foi possível conectar ao servidor. Verifique:\n\n' +
+                         '• Sua conexão com a internet está funcionando?\n' +
+                         '• O servidor está online?\n' +
+                         '• Há algum firewall ou antivírus bloqueando?\n\n' +
+                         'Tente novamente em alguns instantes.';
+        } else if (error.message.includes('HTTP')) {
+            errorMessage = error.message;
+            userMessage = '⚠️ Erro no servidor:\n\n' + error.message + '\n\n' +
+                         'Entre em contato com o suporte informando este erro.';
+        } else {
+            errorMessage = error.message;
+            userMessage = '❌ Erro ao processar sua solicitação:\n\n' + error.message;
+        }
+        
+        console.error('📋 Diagnóstico:', errorMessage);
+        alert(userMessage + '\n\n📞 Suporte: WhatsApp (61) 3359-7358');
     })
     .finally(() => {
         // Reset button
