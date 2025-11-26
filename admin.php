@@ -192,8 +192,29 @@ if (isset($_POST['action']) && $_POST['action'] === 'updateCredentials') {
 // API para carregar currículos (disponível para admin e analisador)
 if (isset($_GET['action']) && $_GET['action'] === 'getCurriculos' && canAccessAction('getCurriculos')) {
     header('Content-Type: application/json');
-    $stmt = $pdo->query("SELECT id, nome, telefone, email, cidade, data_cadastro FROM curriculos ORDER BY data_cadastro DESC");
+
+    // Parâmetros de filtro
+    $statusFilter = $_GET['status'] ?? '';
+    $showArchived = isset($_GET['show_archived']) && $_GET['show_archived'] === '1';
+
+    // Construir query com filtros
+    $where = [];
+    $params = [];
+
+    if ($statusFilter) {
+        $where[] = "status = ?";
+        $params[] = $statusFilter;
+    } elseif (!$showArchived) {
+        // Por padrão, não mostrar arquivados
+        $where[] = "status != 'arquivado'";
+    }
+
+    $whereClause = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+
+    $stmt = $pdo->prepare("SELECT id, nome, telefone, email, cidade, data_cadastro, status, visualizado, data_visualizacao FROM curriculos {$whereClause} ORDER BY data_cadastro DESC");
+    $stmt->execute($params);
     $curriculos = $stmt->fetchAll();
+
     echo json_encode(['success' => true, 'curriculos' => $curriculos]);
     exit;
 }
@@ -212,6 +233,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'getCurriculoDetails' && isset
     $curriculo = $stmt->fetch();
 
     if ($curriculo) {
+        // Marcar como visualizado se ainda não foi
+        if (!$curriculo['visualizado']) {
+            $updateStmt = $pdo->prepare("UPDATE curriculos SET visualizado = 1, data_visualizacao = NOW(), status = CASE WHEN status = 'pendente_novo' THEN 'pendente' ELSE status END WHERE id = ?");
+            $updateStmt->execute([$id]);
+            $curriculo['visualizado'] = 1;
+            $curriculo['data_visualizacao'] = date('Y-m-d H:i:s');
+            if ($curriculo['status'] === 'pendente_novo') {
+                $curriculo['status'] = 'pendente';
+            }
+        }
+
         // Decodificar o JSON de experiências para um formato mais amigável
         if (!empty($curriculo['experiencias'])) {
             $curriculo['experiencias'] = json_decode($curriculo['experiencias'], true);
@@ -234,6 +266,42 @@ $currentAction = $_POST['action'] ?? $_GET['action'] ?? '';
 if (!canAccessAction($currentAction)) {
     logError("Tentativa de acesso não autorizado à ação '$currentAction' por usuário tipo '" . getUserType() . "'", 'WARNING');
     echo json_encode(['success' => false, 'message' => 'Acesso negado: permissões insuficientes.']);
+    exit;
+}
+
+// API para atualizar status do currículo
+if (isset($_POST['action']) && $_POST['action'] === 'updateCurriculoStatus' && canAccessAction('updateCurriculoStatus')) {
+    header('Content-Type: application/json');
+
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+        exit;
+    }
+
+    $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+    $status = $_POST['status'] ?? '';
+
+    if (!$id) {
+        echo json_encode(['success' => false, 'message' => 'ID inválido.']);
+        exit;
+    }
+
+    $validStatuses = ['pendente_novo', 'pendente', 'classificado', 'arquivado'];
+    if (!in_array($status, $validStatuses)) {
+        echo json_encode(['success' => false, 'message' => 'Status inválido.']);
+        exit;
+    }
+
+    try {
+        $stmt = $pdo->prepare("UPDATE curriculos SET status = ? WHERE id = ?");
+        $stmt->execute([$status, $id]);
+
+        logError("Status do currículo ID {$id} alterado para '{$status}' pelo usuário {$_SESSION['user_email']}", 'INFO');
+        echo json_encode(['success' => true, 'message' => 'Status atualizado com sucesso!']);
+    } catch (PDOException $e) {
+        logError('Erro ao atualizar status do currículo: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Erro ao atualizar status.']);
+    }
     exit;
 }
 
@@ -1179,6 +1247,37 @@ $totalCurriculos = $stmt->fetchColumn();
             background: #f3f4f6;
             border-color: #9ca3af;
         }
+
+        /* Estilos para badges de status */
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            display: inline-block;
+        }
+        .status-novo {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .status-pendente {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .status-classificado {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status-arquivado {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .status-select {
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            background: white;
+        }
     </style>
 </head>
 <body>
@@ -1214,8 +1313,31 @@ $totalCurriculos = $stmt->fetchColumn();
                 <!-- Tab Currículos -->
                 <div id="curriculos-tab" class="tab-content active">
                     <h3><i class="fas fa-list"></i> Currículos Cadastrados</h3>
+
+                    <!-- Filtros -->
+                    <div class="filters-section" style="margin-bottom: 20px;">
+                        <div class="filters-row">
+                            <div class="filter-group">
+                                <label>Status:</label>
+                                <select id="statusFilter" onchange="loadCurriculos()">
+                                    <option value="">Todos (exceto arquivados)</option>
+                                    <option value="pendente_novo">Pendente - Novo</option>
+                                    <option value="pendente">Pendente</option>
+                                    <option value="classificado">Classificado</option>
+                                    <option value="arquivado">Arquivado</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>
+                                    <input type="checkbox" id="showArchived" onchange="loadCurriculos()"> Mostrar Arquivados
+                                </label>
+                            </div>
+                            <button class="btn-secondary" onclick="loadCurriculos()"><i class="fas fa-sync-alt"></i> Atualizar</button>
+                        </div>
+                    </div>
+
                     <table class="curriculos-table">
-                        <thead><tr><th>Data/Hora</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Cidade</th><th>Ações</th></tr></thead>
+                        <thead><tr><th>Data/Hora</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Cidade</th><th>Status</th><th>Ações</th></tr></thead>
                         <tbody id="curriculos-tbody">
                             <!-- Conteúdo carregado via JS -->
                         </tbody>
@@ -1556,32 +1678,98 @@ $totalCurriculos = $stmt->fetchColumn();
                 return;
             }
 
-            fetch('admin.php?action=getCurriculos')
+            // Obter filtros
+            const statusFilter = document.getElementById('statusFilter')?.value || '';
+            const showArchived = document.getElementById('showArchived')?.checked ? '1' : '0';
+
+            // Construir URL com parâmetros
+            const params = new URLSearchParams({
+                action: 'getCurriculos'
+            });
+
+            if (statusFilter) {
+                params.append('status', statusFilter);
+            }
+            if (showArchived === '1') {
+                params.append('show_archived', '1');
+            }
+
+            fetch('admin.php?' + params)
                 .then(res => res.json())
                 .then(data => {
                     const tbody = document.getElementById('curriculos-tbody');
                     if (data.success && data.curriculos.length > 0) {
-                        tbody.innerHTML = data.curriculos.map(c => `
-                            <tr>
-                                <td>${new Date(c.data_cadastro).toLocaleString('pt-BR')}</td>
-                                <td>${c.nome}</td>
-                                <td>${c.telefone}</td>
-                                <td>${c.email || 'N/A'}</td>
-                                <td>${c.cidade}</td>
-                                <td>
-                                    <button class="btn-primary btn-small" onclick="viewCurriculo(${c.id})"><i class="fas fa-eye"></i> Ver</button>
-                                    ${userType === 'admin' ? `<button class="btn-remove btn-small" onclick="deleteCurriculo(${c.id}, this)"><i class="fas fa-trash"></i> Deletar</button>` : ''}
-                                </td>
-                            </tr>
-                        `).join('');
+                        tbody.innerHTML = data.curriculos.map(c => {
+                            const statusLabels = {
+                                'pendente_novo': '<span class="status-badge status-novo">Pendente - Novo</span>',
+                                'pendente': '<span class="status-badge status-pendente">Pendente</span>',
+                                'classificado': '<span class="status-badge status-classificado">Classificado</span>',
+                                'arquivado': '<span class="status-badge status-arquivado">Arquivado</span>'
+                            };
+
+                            const statusHtml = statusLabels[c.status] || c.status;
+
+                            return `
+                                <tr>
+                                    <td>${new Date(c.data_cadastro).toLocaleString('pt-BR')}</td>
+                                    <td>${c.nome}</td>
+                                    <td>${c.telefone}</td>
+                                    <td>${c.email || 'N/A'}</td>
+                                    <td>${c.cidade}</td>
+                                    <td>${statusHtml}</td>
+                                    <td>
+                                        <button class="btn-primary btn-small" onclick="viewCurriculo(${c.id})"><i class="fas fa-eye"></i> Ver</button>
+                                        <select class="status-select" onchange="changeStatus(${c.id}, this.value)" style="margin-left: 5px; padding: 2px 5px; font-size: 0.8rem;">
+                                            <option value="pendente_novo" ${c.status === 'pendente_novo' ? 'selected' : ''}>Pendente - Novo</option>
+                                            <option value="pendente" ${c.status === 'pendente' ? 'selected' : ''}>Pendente</option>
+                                            <option value="classificado" ${c.status === 'classificado' ? 'selected' : ''}>Classificado</option>
+                                            <option value="arquivado" ${c.status === 'arquivado' ? 'selected' : ''}>Arquivado</option>
+                                        </select>
+                                        ${userType === 'admin' ? `<button class="btn-remove btn-small" onclick="deleteCurriculo(${c.id}, this)" style="margin-left: 5px;"><i class="fas fa-trash"></i> Deletar</button>` : ''}
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('');
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="6">Nenhum currículo encontrado.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="7">Nenhum currículo encontrado.</td></tr>';
                     }
                 })
                 .catch(err => {
                     console.error('Erro ao carregar currículos:', err);
                     const tbody = document.getElementById('curriculos-tbody');
-                    tbody.innerHTML = '<tr><td colspan="6">Erro ao carregar currículos.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7">Erro ao carregar currículos.</td></tr>';
+                });
+        }
+
+        // Função para alterar status do currículo
+        function changeStatus(curriculoId, newStatus) {
+            const formData = new FormData();
+            formData.append('action', 'updateCurriculoStatus');
+            formData.append('id', curriculoId);
+            formData.append('status', newStatus);
+
+            // Pegar token CSRF
+            const csrfToken = document.querySelector('input[name="csrf_token"]');
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken.value);
+            }
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        // Recarregar lista para atualizar visual
+                        loadCurriculos();
+                    } else {
+                        alert('Erro: ' + data.message);
+                        // Recarregar para reverter mudança
+                        loadCurriculos();
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao alterar status:', err);
+                    alert('Erro ao alterar status do currículo.');
+                    loadCurriculos();
                 });
         }
         

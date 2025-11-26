@@ -162,7 +162,7 @@ class DatabaseMigration {
                 'description' => 'Reorganização completa do sistema',
                 'script' => function($pdo) {
                     // Atualizar estrutura para compatibilidade com nova versão
-                    
+
                     // Verificar e adicionar colunas que podem estar faltando
                     $columnsToAdd = [
                         'usuarios' => [
@@ -177,12 +177,12 @@ class DatabaseMigration {
                             'INDEXes' => true
                         ]
                     ];
-                    
+
                     // Aplicar alterações de estrutura
                     foreach ($columnsToAdd as $table => $columns) {
                         foreach ($columns as $column => $definition) {
                             if ($column === 'INDEXes') continue;
-                            
+
                             try {
                                 $pdo->exec("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}");
                             } catch (Exception $e) {
@@ -190,7 +190,7 @@ class DatabaseMigration {
                             }
                         }
                     }
-                    
+
                     // Garantir que todos os índices existem
                     $indices = [
                         'usuarios' => ['idx_email'],
@@ -198,7 +198,7 @@ class DatabaseMigration {
                         'curriculos' => ['idx_nome', 'idx_email', 'idx_data_cadastro', 'idx_cidade', 'idx_estado'],
                         'form_interactions' => ['idx_session', 'idx_ip', 'idx_timestamp', 'idx_device']
                     ];
-                    
+
                     foreach ($indices as $table => $indexes) {
                         foreach ($indexes as $index) {
                             try {
@@ -208,8 +208,28 @@ class DatabaseMigration {
                             }
                         }
                     }
-                    
+
                     return "Sistema atualizado para versão 2.0 com sucesso";
+                }
+            ],
+            '2.1.0' => [
+                'description' => 'Sistema de status para currículos',
+                'script' => function($pdo) {
+                    // Adicionar coluna de status à tabela curriculos
+                    try {
+                        $pdo->exec("ALTER TABLE curriculos ADD COLUMN status ENUM('pendente_novo', 'pendente', 'classificado', 'arquivado') DEFAULT 'pendente_novo' AFTER data_cadastro");
+                        $pdo->exec("ALTER TABLE curriculos ADD COLUMN visualizado TINYINT(1) DEFAULT 0 AFTER status");
+                        $pdo->exec("ALTER TABLE curriculos ADD COLUMN data_visualizacao TIMESTAMP NULL AFTER visualizado");
+
+                        // Criar índices para os novos campos
+                        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_curriculos_status ON curriculos(status)");
+                        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_curriculos_visualizado ON curriculos(visualizado)");
+
+                        return "Sistema de status para currículos implementado com sucesso";
+                    } catch (Exception $e) {
+                        // Se a coluna já existe, apenas retornar sucesso
+                        return "Sistema de status já estava implementado";
+                    }
                 }
             ]
         ];
@@ -263,7 +283,9 @@ class DatabaseMigration {
             $this->pdo->commit();
             
         } catch (Exception $e) {
-            $this->pdo->rollBack();
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
             throw $e;
         }
         
