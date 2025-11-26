@@ -195,3 +195,42 @@
 [2025-11-26 15:09:36] [INFO] [IP: ::1] Tentativa de login para email: gilsonoliverr@gmail.com
 [2025-11-26 15:09:36] [INFO] [IP: ::1] Usuário encontrado: gilsonoliverr@gmail.com, tipo: admin, senha hash: $2y$10$Jvu...
 [2025-11-26 15:09:36] [INFO] [IP: ::1] Login bem-sucedido para usuário gilsonoliverr@gmail.com (tipo: admin)
+[2025-11-26 15:10:20] [INFO] [IP: ::1] Novo usuário criado: atendimentogor@gmail.com (tipo: analisador) pelo admin gilsonoliverr@gmail.com
+[2025-11-26 15:10:28] [INFO] [IP: ::1] Tentativa de login para email: atendimentogor@gmail.com
+[2025-11-26 15:10:28] [INFO] [IP: ::1] Usuário encontrado: atendimentogor@gmail.com, tipo: analisador, senha hash: $2y$10$MKl...
+[2025-11-26 15:10:28] [INFO] [IP: ::1] Login bem-sucedido para usuário atendimentogor@gmail.com (tipo: analisador)
+[2025-11-26 15:10:28] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:14:12] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:14:19] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:14:27] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:14:29] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:14:31] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:14:33] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:14:43] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:14:45] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:14:52] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:14:56] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:15:08] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:15:23] [INFO] [IP: ::1] Tentativa de login para email: atendimentogor@gmail.com
+[2025-11-26 15:15:23] [INFO] [IP: ::1] Usuário encontrado: atendimentogor@gmail.com, tipo: analisador, senha hash: $2y$10$MKl...
+[2025-11-26 15:15:23] [INFO] [IP: ::1] Login bem-sucedido para usuário atendimentogor@gmail.com (tipo: analisador)
+[2025-11-26 15:15:23] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:15:46] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:15:48] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:16:11] [INFO] [IP: ::1] Tentativa de login para email: analisador@gorinformatica.com.brm
+[2025-11-26 15:16:11] [WARNING] [IP: ::1] Usuário não encontrado: analisador@gorinformatica.com.brm
+[2025-11-26 15:20:47] [INFO] [IP: ::1] Tentativa de login para email: atendimentogor@gmail.com
+[2025-11-26 15:20:47] [INFO] [IP: ::1] Usuário encontrado: atendimentogor@gmail.com, tipo: analisador, senha hash: $2y$10$MKl...
+[2025-11-26 15:20:47] [INFO] [IP: ::1] Login bem-sucedido para usuário atendimentogor@gmail.com (tipo: analisador)
+[2025-11-26 15:20:47] [WARNING] [IP: ::1] Tentativa de acesso não autorizado à ação '' por usuário tipo 'analisador'
+[2025-11-26 15:22:13] [INFO] [IP: ::1] Tentativa de login para email: gilsonoliverr@gmail.com
+[2025-11-26 15:22:13] [INFO] [IP: ::1] Usuário encontrado: gilsonoliverr@gmail.com, tipo: admin, senha hash: $2y$10$Jvu...
+[2025-11-26 15:22:13] [INFO] [IP: ::1] Login bem-sucedido para usuário gilsonoliverr@gmail.com (tipo: admin)
+[2025-11-26 15:23:05] [WARNING] [IP: ::1] API Token ou Número de Notificação não configurado. Notificação pulada.
+[2025-11-26 15:23:07] [WARNING] [IP: ::1] Falha ao enviar notificação por email
+[2025-11-26 15:23:24] [INFO] [IP: ::1] Tentativa de login para email: atendimentogor@gmail.com
+[2025-11-26 15:23:24] [INFO] [IP: ::1] Usuário encontrado: atendimentogor@gmail.com, tipo: analisador, senha hash: $2y$10$MKl...
+[2025-11-26 15:23:24] [INFO] [IP: ::1] Login bem-sucedido para usuário atendimentogor@gmail.com (tipo: analisador)
+[2025-11-26 15:24:34] [INFO] [IP: ::1] Tentativa de login para email: atendimentogor@gmail.com
+[2025-11-26 15:24:34] [INFO] [IP: ::1] Usuário encontrado: atendimentogor@gmail.com, tipo: analisador, senha hash: $2y$10$MKl...
+[2025-11-26 15:24:34] [INFO] [IP: ::1] Login bem-sucedido para usuário atendimentogor@gmail.com (tipo: analisador)

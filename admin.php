@@ -71,7 +71,7 @@ function canAccessTab($tab) {
     if ($userType === 'admin') {
         return true; // admin acessa tudo
     } elseif ($userType === 'analisador') {
-        return $tab === 'curriculos'; // analisador só currículos
+        return $tab === 'curriculos' || $tab === 'interactions'; // analisador acessa currículos e interações
     }
     logError("Tentativa de acesso à aba '$tab' por usuário tipo '$userType' - acesso negado", 'WARNING');
     return false;
@@ -80,14 +80,8 @@ function canAccessTab($tab) {
 // Verificar se usuário pode executar uma ação específica
 function canAccessAction($action) {
     $userType = getUserType();
-    if ($userType === 'admin') {
-        return true; // admin pode tudo
-    } elseif ($userType === 'analisador') {
-        // analisador só pode ações relacionadas a currículos e própria senha
-        $allowedActions = [
-            'getCurriculos', 'getCurriculoDetails', 'updateCredentials'
-        ];
-        return in_array($action, $allowedActions);
+    if ($userType === 'admin' || $userType === 'analisador') {
+        return true; // admin e analisador podem tudo
     }
     return false;
 }
@@ -195,56 +189,55 @@ if (isset($_POST['action']) && $_POST['action'] === 'updateCredentials') {
 }
 
 // --- APIs para usuários logados (incluindo analisadores) ---
-if (isAdmin()) {
-    // API para carregar currículos
-    if (isset($_GET['action']) && $_GET['action'] === 'getCurriculos') {
-        header('Content-Type: application/json');
-        $stmt = $pdo->query("SELECT id, nome, telefone, email, cidade, data_cadastro FROM curriculos ORDER BY data_cadastro DESC");
-        $curriculos = $stmt->fetchAll();
-        echo json_encode(['success' => true, 'curriculos' => $curriculos]);
+// API para carregar currículos (disponível para admin e analisador)
+if (isset($_GET['action']) && $_GET['action'] === 'getCurriculos' && canAccessAction('getCurriculos')) {
+    header('Content-Type: application/json');
+    $stmt = $pdo->query("SELECT id, nome, telefone, email, cidade, data_cadastro FROM curriculos ORDER BY data_cadastro DESC");
+    $curriculos = $stmt->fetchAll();
+    echo json_encode(['success' => true, 'curriculos' => $curriculos]);
+    exit;
+}
+
+// API para buscar detalhes de um currículo específico (disponível para admin e analisador)
+if (isset($_GET['action']) && $_GET['action'] === 'getCurriculoDetails' && isset($_GET['id']) && canAccessAction('getCurriculoDetails')) {
+    header('Content-Type: application/json');
+    $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+    if (!$id) {
+        echo json_encode(['success' => false, 'message' => 'ID inválido.']);
         exit;
     }
 
-    // API para buscar detalhes de um currículo específico
-    if (isset($_GET['action']) && $_GET['action'] === 'getCurriculoDetails' && isset($_GET['id'])) {
-        header('Content-Type: application/json');
-        $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-        if (!$id) {
-            echo json_encode(['success' => false, 'message' => 'ID inválido.']);
-            exit;
+    $stmt = $pdo->prepare("SELECT * FROM curriculos WHERE id = ?");
+    $stmt->execute([$id]);
+    $curriculo = $stmt->fetch();
+
+    if ($curriculo) {
+        // Decodificar o JSON de experiências para um formato mais amigável
+        if (!empty($curriculo['experiencias'])) {
+            $curriculo['experiencias'] = json_decode($curriculo['experiencias'], true);
         }
+        // Converter valores booleanos de volta para texto para exibição
+        $curriculo['is_whatsapp'] = $curriculo['is_whatsapp'] ? 'Sim' : 'Não';
+        $curriculo['estudando'] = $curriculo['estudando'] ? 'Sim, estou!' : 'Não, não estou!';
+        $curriculo['possui_cursos'] = $curriculo['possui_cursos'] ? 'Sim' : 'Não';
+        $curriculo['possui_experiencia'] = $curriculo['possui_experiencia'] ? 'Sim' : 'Não';
 
-        $stmt = $pdo->prepare("SELECT * FROM curriculos WHERE id = ?");
-        $stmt->execute([$id]);
-        $curriculo = $stmt->fetch();
-
-        if ($curriculo) {
-            // Decodificar o JSON de experiências para um formato mais amigável
-            if (!empty($curriculo['experiencias'])) {
-                $curriculo['experiencias'] = json_decode($curriculo['experiencias'], true);
-            }
-            // Converter valores booleanos de volta para texto para exibição
-            $curriculo['is_whatsapp'] = $curriculo['is_whatsapp'] ? 'Sim' : 'Não';
-            $curriculo['estudando'] = $curriculo['estudando'] ? 'Sim, estou!' : 'Não, não estou!';
-            $curriculo['possui_cursos'] = $curriculo['possui_cursos'] ? 'Sim' : 'Não';
-            $curriculo['possui_experiencia'] = $curriculo['possui_experiencia'] ? 'Sim' : 'Não';
-
-            echo json_encode(['success' => true, 'curriculo' => $curriculo]);
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Currículo não encontrado.']);
-        }
-        exit;
+        echo json_encode(['success' => true, 'curriculo' => $curriculo]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Currículo não encontrado.']);
     }
+    exit;
+}
+
+// Verificar permissões para ações específicas
+$currentAction = $_POST['action'] ?? $_GET['action'] ?? '';
+if (!canAccessAction($currentAction)) {
+    logError("Tentativa de acesso não autorizado à ação '$currentAction' por usuário tipo '" . getUserType() . "'", 'WARNING');
+    echo json_encode(['success' => false, 'message' => 'Acesso negado: permissões insuficientes.']);
+    exit;
 }
 
 if (isAdmin()) {
-    // Verificar permissões para ações específicas
-    $currentAction = $_POST['action'] ?? $_GET['action'] ?? '';
-    if (!canAccessAction($currentAction)) {
-        logError("Tentativa de acesso não autorizado à ação '$currentAction' por usuário tipo '" . getUserType() . "'", 'WARNING');
-        echo json_encode(['success' => false, 'message' => 'Acesso negado: permissões insuficientes.']);
-        exit;
-    }
     // Teste de envio da API
     if (isset($_POST['action']) && $_POST['action'] === 'testApiSend') {
         header('Content-Type: application/json');
@@ -1199,22 +1192,24 @@ $totalCurriculos = $stmt->fetchColumn();
 
         <div class="admin-panel">
             <div class="panel-content">
+                <?php if (getUserType() === 'admin' || getUserType() === 'analisador'): ?>
                 <div class="stats-card">
                     <div class="stat"><h3>Currículos Recebidos</h3><p class="stat-number"><?php echo $totalCurriculos; ?></p></div>
                     <i class="fas fa-users"></i>
                 </div>
 
                 <div class="tabs">
-                     <button class="tab active" onclick="showTab('curriculos')"><i class="fas fa-list"></i> Currículos</button>
-                     <?php if (getUserType() === 'admin'): ?>
-                     <button class="tab" onclick="showTab('interactions')"><i class="fas fa-chart-line"></i> Interações do Formulário</button>
-                     <button class="tab" onclick="showTab('users')"><i class="fas fa-users"></i> Usuários</button>
-                     <button class="tab" onclick="showTab('config')"><i class="fas fa-cog"></i> Configurações</button>
-                     <button class="tab" onclick="showTab('tests')"><i class="fas fa-vial"></i> Testes da API</button>
-                     <button class="tab" onclick="showTab('logs')"><i class="fas fa-file-alt"></i> Logs do Sistema</button>
-                     <button class="tab" onclick="showTab('access')"><i class="fas fa-eye"></i> Logs de Acesso</button>
-                     <?php endif; ?>
-                 </div>
+                      <button class="tab active" onclick="showTab('curriculos')"><i class="fas fa-list"></i> Currículos</button>
+                      <button class="tab" onclick="showTab('interactions')"><i class="fas fa-chart-line"></i> Interações do Formulário</button>
+                      <?php if (getUserType() === 'admin'): ?>
+                      <button class="tab" onclick="showTab('users')"><i class="fas fa-users"></i> Usuários</button>
+                      <button class="tab" onclick="showTab('config')"><i class="fas fa-cog"></i> Configurações</button>
+                      <button class="tab" onclick="showTab('tests')"><i class="fas fa-vial"></i> Testes da API</button>
+                      <button class="tab" onclick="showTab('logs')"><i class="fas fa-file-alt"></i> Logs do Sistema</button>
+                      <button class="tab" onclick="showTab('access')"><i class="fas fa-eye"></i> Logs de Acesso</button>
+                      <?php endif; ?>
+                  </div>
+                <?php endif; ?>
 
                 <!-- Tab Currículos -->
                 <div id="curriculos-tab" class="tab-content active">
@@ -1228,7 +1223,7 @@ $totalCurriculos = $stmt->fetchColumn();
                 </div>
 
                 <!-- Tab Interações do Formulário -->
-                <?php if (getUserType() === 'admin'): ?>
+                <?php if (getUserType() === 'admin' || getUserType() === 'analisador'): ?>
                 <div id="interactions-tab" class="tab-content">
                     <h3><i class="fas fa-chart-line"></i> Análise de Interações do Formulário</h3>
 
@@ -1524,7 +1519,7 @@ $totalCurriculos = $stmt->fetchColumn();
             if (userType === 'admin') {
                 return true; // admin acessa tudo
             } else if (userType === 'analisador') {
-                return tabName === 'curriculos'; // analisador só currículos
+                return tabName === 'curriculos' || tabName === 'interactions'; // analisador acessa currículos e interações
             }
             return false;
         }
@@ -1556,6 +1551,11 @@ $totalCurriculos = $stmt->fetchColumn();
 
         // Carregar currículos via fetch
         function loadCurriculos() {
+            // Verificar se usuário pode carregar currículos
+            if (userType !== 'admin' && userType !== 'analisador') {
+                return;
+            }
+
             fetch('admin.php?action=getCurriculos')
                 .then(res => res.json())
                 .then(data => {
@@ -1570,13 +1570,18 @@ $totalCurriculos = $stmt->fetchColumn();
                                 <td>${c.cidade}</td>
                                 <td>
                                     <button class="btn-primary btn-small" onclick="viewCurriculo(${c.id})"><i class="fas fa-eye"></i> Ver</button>
-                                    <button class="btn-remove btn-small" onclick="deleteCurriculo(${c.id}, this)"><i class="fas fa-trash"></i> Deletar</button>
+                                    ${userType === 'admin' ? `<button class="btn-remove btn-small" onclick="deleteCurriculo(${c.id}, this)"><i class="fas fa-trash"></i> Deletar</button>` : ''}
                                 </td>
                             </tr>
                         `).join('');
                     } else {
                         tbody.innerHTML = '<tr><td colspan="6">Nenhum currículo encontrado.</td></tr>';
                     }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar currículos:', err);
+                    const tbody = document.getElementById('curriculos-tbody');
+                    tbody.innerHTML = '<tr><td colspan="6">Erro ao carregar currículos.</td></tr>';
                 });
         }
         
@@ -2262,9 +2267,19 @@ $totalCurriculos = $stmt->fetchColumn();
 
         // Carregamento inicial
         document.addEventListener('DOMContentLoaded', function() {
-            loadCurriculos();
+            if (userType === 'admin' || userType === 'analisador') {
+                loadCurriculos();
+            }
             if (userType === 'admin') {
                 loadUsers();
+            }
+            if (userType === 'admin' || userType === 'analisador') {
+                // Carregar estatísticas de interações para admin e analisador
+                if (document.getElementById('interactions-tab')) {
+                    loadInteractionStats();
+                    loadAbandonmentAnalysis();
+                    loadInteractions();
+                }
             }
         });
     </script>
