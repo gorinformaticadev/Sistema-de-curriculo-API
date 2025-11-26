@@ -71,7 +71,7 @@ function canAccessTab($tab) {
     if ($userType === 'admin') {
         return true; // admin acessa tudo
     } elseif ($userType === 'analisador') {
-        return $tab === 'curriculos' || $tab === 'interactions'; // analisador acessa currículos e interações
+        return $tab === 'curriculos'; // analisador só acessa currículos
     }
     logError("Tentativa de acesso à aba '$tab' por usuário tipo '$userType' - acesso negado", 'WARNING');
     return false;
@@ -1200,8 +1200,8 @@ $totalCurriculos = $stmt->fetchColumn();
 
                 <div class="tabs">
                       <button class="tab active" onclick="showTab('curriculos')"><i class="fas fa-list"></i> Currículos</button>
-                      <button class="tab" onclick="showTab('interactions')"><i class="fas fa-chart-line"></i> Interações do Formulário</button>
                       <?php if (getUserType() === 'admin'): ?>
+                      <button class="tab" onclick="showTab('interactions')"><i class="fas fa-chart-line"></i> Interações do Formulário</button>
                       <button class="tab" onclick="showTab('users')"><i class="fas fa-users"></i> Usuários</button>
                       <button class="tab" onclick="showTab('config')"><i class="fas fa-cog"></i> Configurações</button>
                       <button class="tab" onclick="showTab('tests')"><i class="fas fa-vial"></i> Testes da API</button>
@@ -2299,9 +2299,7 @@ $totalCurriculos = $stmt->fetchColumn();
             }
             if (userType === 'admin') {
                 loadUsers();
-            }
-            if (userType === 'admin' || userType === 'analisador') {
-                // Carregar estatísticas de interações para admin e analisador
+                // Carregar estatísticas de interações apenas para admin
                 if (document.getElementById('interactions-tab')) {
                     loadInteractionStats();
                     loadAbandonmentAnalysis();
