@@ -32,6 +32,7 @@ try {
     // Verificar colunas da tabela 'usuarios'
     checkAndAddColumn($pdo, 'usuarios', 'email', 'VARCHAR(255) NOT NULL UNIQUE');
     checkAndAddColumn($pdo, 'usuarios', 'senha', 'VARCHAR(255) NOT NULL');
+    checkAndAddColumn($pdo, 'usuarios', 'tipo', "ENUM('admin', 'analisador') DEFAULT 'admin'");
     checkAndAddColumn($pdo, 'usuarios', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
 
     // Inserir usuário admin padrão se não existir

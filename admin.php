@@ -60,6 +60,38 @@ function isAdmin() {
     return isset($_SESSION['admin']) && $_SESSION['admin'] === true;
 }
 
+// Verificar tipo de usuário
+function getUserType() {
+    return $_SESSION['user_type'] ?? 'admin'; // padrão admin para compatibilidade
+}
+
+// Verificar se usuário pode acessar uma aba específica
+function canAccessTab($tab) {
+    $userType = getUserType();
+    if ($userType === 'admin') {
+        return true; // admin acessa tudo
+    } elseif ($userType === 'analisador') {
+        return $tab === 'curriculos'; // analisador só currículos
+    }
+    logError("Tentativa de acesso à aba '$tab' por usuário tipo '$userType' - acesso negado", 'WARNING');
+    return false;
+}
+
+// Verificar se usuário pode executar uma ação específica
+function canAccessAction($action) {
+    $userType = getUserType();
+    if ($userType === 'admin') {
+        return true; // admin pode tudo
+    } elseif ($userType === 'analisador') {
+        // analisador só pode ações relacionadas a currículos e própria senha
+        $allowedActions = [
+            'getCurriculos', 'getCurriculoDetails', 'updateCredentials'
+        ];
+        return in_array($action, $allowedActions);
+    }
+    return false;
+}
+
 // --- PROCESSAMENTO DE AÇÕES (POST/GET) ---
 
 // Login
@@ -67,19 +99,28 @@ if (isset($_POST['login'])) {
     $email = $_POST['email'] ?? '';
     $password = $_POST['password'] ?? '';
 
+    logError("Tentativa de login para email: $email", 'INFO');
     $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE email = ?");
     $stmt->execute([$email]);
     $user = $stmt->fetch();
 
-    if ($user && password_verify($password, $user['senha'])) {
-        $_SESSION['admin'] = true;
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['user_email'] = $user['email'];
-        header('Location: admin.php');
-        exit;
+    if ($user) {
+        logError("Usuário encontrado: {$user['email']}, tipo: {$user['tipo']}, senha hash: " . substr($user['senha'], 0, 10) . "...", 'INFO');
+        if (password_verify($password, $user['senha'])) {
+            $_SESSION['admin'] = true;
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['user_email'] = $user['email'];
+            $_SESSION['user_type'] = $user['tipo'] ?? 'admin'; // compatibilidade
+            logError("Login bem-sucedido para usuário {$user['email']} (tipo: {$_SESSION['user_type']})", 'INFO');
+            header('Location: admin.php');
+            exit;
+        } else {
+            logError("Senha incorreta para usuário: $email", 'WARNING');
+        }
     } else {
-        $error = 'Credenciais inválidas';
+        logError("Usuário não encontrado: $email", 'WARNING');
     }
+    $error = 'Credenciais inválidas';
 }
 
 // Logout
@@ -96,7 +137,114 @@ if (isAdmin() && empty($_SESSION['csrf_token'])) {
 
 
 // --- APIs INTERNAS (Ações do Painel) ---
+
+// Atualizar credenciais do usuário (permitido para todos os usuários logados)
+if (isset($_POST['action']) && $_POST['action'] === 'updateCredentials') {
+    header('Content-Type: application/json');
+
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+        exit;
+    }
+
+    // Log para depuração
+    logError("Tentativa de atualização de credenciais. DADOS POST: " . json_encode($_POST) . " | SESSÃO: " . json_encode($_SESSION), 'INFO');
+
+    $email = $_POST['email'] ?? null;
+    $password = $_POST['password'] ?? null;
+    $userId = $_SESSION['user_id'] ?? null;
+
+    if (empty($userId)) {
+        echo json_encode(['success' => false, 'message' => 'Erro: Sessão de usuário inválida.']);
+        exit;
+    }
+
+    if (empty($email)) {
+        echo json_encode(['success' => false, 'message' => 'O email não pode ser vazio.']);
+        exit;
+    }
+
+    // Verificar se é admin ou se está alterando apenas a própria senha
+    $userType = getUserType();
+    if ($userType === 'analisador') {
+        // Analisadores só podem alterar senha, não email
+        if (empty($password)) {
+            echo json_encode(['success' => false, 'message' => 'Analisadores só podem alterar a senha.']);
+            exit;
+        }
+        // Manter o email atual
+        $stmt = $pdo->prepare("SELECT email FROM usuarios WHERE id = ?");
+        $stmt->execute([$userId]);
+        $currentUser = $stmt->fetch();
+        $email = $currentUser['email'];
+    }
+
+    if (!empty($password)) {
+        // Atualiza email e senha
+        $newHash = password_hash($password, PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare("UPDATE usuarios SET email = ?, senha = ? WHERE id = ?");
+        $stmt->execute([$email, $newHash, $_SESSION['user_id']]);
+    } else {
+        // Atualiza apenas o email (apenas admin)
+        $stmt = $pdo->prepare("UPDATE usuarios SET email = ? WHERE id = ?");
+        $stmt->execute([$email, $_SESSION['user_id']]);
+    }
+    $_SESSION['user_email'] = $email; // Atualiza o email na sessão
+    echo json_encode(['success' => true, 'message' => 'Credenciais atualizadas com sucesso!']);
+    exit;
+}
+
+// --- APIs para usuários logados (incluindo analisadores) ---
 if (isAdmin()) {
+    // API para carregar currículos
+    if (isset($_GET['action']) && $_GET['action'] === 'getCurriculos') {
+        header('Content-Type: application/json');
+        $stmt = $pdo->query("SELECT id, nome, telefone, email, cidade, data_cadastro FROM curriculos ORDER BY data_cadastro DESC");
+        $curriculos = $stmt->fetchAll();
+        echo json_encode(['success' => true, 'curriculos' => $curriculos]);
+        exit;
+    }
+
+    // API para buscar detalhes de um currículo específico
+    if (isset($_GET['action']) && $_GET['action'] === 'getCurriculoDetails' && isset($_GET['id'])) {
+        header('Content-Type: application/json');
+        $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'ID inválido.']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM curriculos WHERE id = ?");
+        $stmt->execute([$id]);
+        $curriculo = $stmt->fetch();
+
+        if ($curriculo) {
+            // Decodificar o JSON de experiências para um formato mais amigável
+            if (!empty($curriculo['experiencias'])) {
+                $curriculo['experiencias'] = json_decode($curriculo['experiencias'], true);
+            }
+            // Converter valores booleanos de volta para texto para exibição
+            $curriculo['is_whatsapp'] = $curriculo['is_whatsapp'] ? 'Sim' : 'Não';
+            $curriculo['estudando'] = $curriculo['estudando'] ? 'Sim, estou!' : 'Não, não estou!';
+            $curriculo['possui_cursos'] = $curriculo['possui_cursos'] ? 'Sim' : 'Não';
+            $curriculo['possui_experiencia'] = $curriculo['possui_experiencia'] ? 'Sim' : 'Não';
+
+            echo json_encode(['success' => true, 'curriculo' => $curriculo]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Currículo não encontrado.']);
+        }
+        exit;
+    }
+}
+
+if (isAdmin()) {
+    // Verificar permissões para ações específicas
+    $currentAction = $_POST['action'] ?? $_GET['action'] ?? '';
+    if (!canAccessAction($currentAction)) {
+        logError("Tentativa de acesso não autorizado à ação '$currentAction' por usuário tipo '" . getUserType() . "'", 'WARNING');
+        echo json_encode(['success' => false, 'message' => 'Acesso negado: permissões insuficientes.']);
+        exit;
+    }
     // Teste de envio da API
     if (isset($_POST['action']) && $_POST['action'] === 'testApiSend') {
         header('Content-Type: application/json');
@@ -181,56 +329,7 @@ if (isAdmin()) {
         exit;
     }
 
-    // Atualizar credenciais do usuário
-    if (isset($_POST['action']) && $_POST['action'] === 'updateCredentials') {
-        header('Content-Type: application/json');
-
-        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
-            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
-            exit;
-        }
-        
-        // Log para depuração
-        logError("Tentativa de atualização de credenciais. DADOS POST: " . json_encode($_POST) . " | SESSÃO: " . json_encode($_SESSION), 'INFO');
-
-        $email = $_POST['email'] ?? null;
-        $password = $_POST['password'] ?? null;
-        $userId = $_SESSION['user_id'] ?? null;
-
-        if (empty($userId)) {
-            echo json_encode(['success' => false, 'message' => 'Erro: Sessão de usuário inválida.']);
-            exit;
-        }
-
-        if (empty($email)) {
-            echo json_encode(['success' => false, 'message' => 'O email não pode ser vazio.']);
-            exit;
-        }
-
-        if (!empty($password)) {
-            // Atualiza email e senha
-            $newHash = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("UPDATE usuarios SET email = ?, senha = ? WHERE id = ?");
-            $stmt->execute([$email, $newHash, $_SESSION['user_id']]);
-        } else {
-            // Atualiza apenas o email
-            $stmt = $pdo->prepare("UPDATE usuarios SET email = ? WHERE id = ?");
-            $stmt->execute([$email, $_SESSION['user_id']]);
-        }
-        $_SESSION['user_email'] = $email; // Atualiza o email na sessão
-        echo json_encode(['success' => true, 'message' => 'Credenciais atualizadas com sucesso!']);
-        exit;
-    }
-    
     // Outras APIs (getCurriculos, getLogs, etc.) permanecem as mesmas por enquanto, mas precisarão ser adaptadas
-    // API para carregar currículos
-    if (isset($_GET['action']) && $_GET['action'] === 'getCurriculos') {
-        header('Content-Type: application/json');
-        $stmt = $pdo->query("SELECT id, nome, telefone, email, cidade, data_cadastro FROM curriculos ORDER BY data_cadastro DESC");
-        $curriculos = $stmt->fetchAll();
-        echo json_encode(['success' => true, 'curriculos' => $curriculos]);
-        exit;
-    }
     
     // API para limpar logs
     if (isset($_POST['action']) && $_POST['action'] === 'clearLogs') {
@@ -311,36 +410,6 @@ if (isAdmin()) {
         exit;
     }
 
-    // API para buscar detalhes de um currículo específico
-    if (isset($_GET['action']) && $_GET['action'] === 'getCurriculoDetails' && isset($_GET['id'])) {
-        header('Content-Type: application/json');
-        $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-        if (!$id) {
-            echo json_encode(['success' => false, 'message' => 'ID inválido.']);
-            exit;
-        }
-
-        $stmt = $pdo->prepare("SELECT * FROM curriculos WHERE id = ?");
-        $stmt->execute([$id]);
-        $curriculo = $stmt->fetch();
-
-        if ($curriculo) {
-            // Decodificar o JSON de experiências para um formato mais amigável
-            if (!empty($curriculo['experiencias'])) {
-                $curriculo['experiencias'] = json_decode($curriculo['experiencias'], true);
-            }
-            // Converter valores booleanos de volta para texto para exibição
-            $curriculo['is_whatsapp'] = $curriculo['is_whatsapp'] ? 'Sim' : 'Não';
-            $curriculo['estudando'] = $curriculo['estudando'] ? 'Sim, estou!' : 'Não, não estou!';
-            $curriculo['possui_cursos'] = $curriculo['possui_cursos'] ? 'Sim' : 'Não';
-            $curriculo['possui_experiencia'] = $curriculo['possui_experiencia'] ? 'Sim' : 'Não';
-
-            echo json_encode(['success' => true, 'curriculo' => $curriculo]);
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Currículo não encontrado.']);
-        }
-        exit;
-    }
 
     // API para deletar um currículo
     if (isset($_POST['action']) && $_POST['action'] === 'deleteCurriculo') {
@@ -562,6 +631,93 @@ if (isAdmin()) {
             ]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // API para listar usuários
+    if (isset($_GET['action']) && $_GET['action'] === 'getUsers') {
+        header('Content-Type: application/json');
+        $stmt = $pdo->query("SELECT id, email, tipo, created_at FROM usuarios ORDER BY created_at DESC");
+        $users = $stmt->fetchAll();
+        echo json_encode(['success' => true, 'users' => $users]);
+        exit;
+    }
+
+    // API para adicionar usuário
+    if (isset($_POST['action']) && $_POST['action'] === 'addUser') {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        $email = $_POST['email'] ?? '';
+        $password = $_POST['password'] ?? '';
+        $tipo = $_POST['tipo'] ?? 'analisador';
+
+        if (empty($email) || empty($password)) {
+            echo json_encode(['success' => false, 'message' => 'Email e senha são obrigatórios.']);
+            exit;
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            echo json_encode(['success' => false, 'message' => 'Email inválido.']);
+            exit;
+        }
+
+        if (!in_array($tipo, ['admin', 'analisador'])) {
+            echo json_encode(['success' => false, 'message' => 'Tipo de usuário inválido.']);
+            exit;
+        }
+
+        try {
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("INSERT INTO usuarios (email, senha, tipo) VALUES (?, ?, ?)");
+            $stmt->execute([$email, $hashedPassword, $tipo]);
+            logError("Novo usuário criado: $email (tipo: $tipo) pelo admin {$_SESSION['user_email']}", 'INFO');
+            echo json_encode(['success' => true, 'message' => 'Usuário criado com sucesso!']);
+        } catch (PDOException $e) {
+            if ($e->getCode() == 23000) { // Duplicate entry
+                echo json_encode(['success' => false, 'message' => 'Este email já está cadastrado.']);
+            } else {
+                logError('Erro ao criar usuário: ' . $e->getMessage());
+                echo json_encode(['success' => false, 'message' => 'Erro ao criar usuário.']);
+            }
+        }
+        exit;
+    }
+
+    // API para deletar usuário
+    if (isset($_POST['action']) && $_POST['action'] === 'deleteUser') {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'ID inválido.']);
+            exit;
+        }
+
+        // Não permitir deletar o próprio usuário
+        if ($id == $_SESSION['user_id']) {
+            echo json_encode(['success' => false, 'message' => 'Você não pode deletar seu próprio usuário.']);
+            exit;
+        }
+
+        try {
+            $stmt = $pdo->prepare("DELETE FROM usuarios WHERE id = ?");
+            $stmt->execute([$id]);
+            logError("Usuário ID: $id deletado pelo admin {$_SESSION['user_email']}", 'WARNING');
+            echo json_encode(['success' => true, 'message' => 'Usuário deletado com sucesso.']);
+        } catch (PDOException $e) {
+            logError('Erro ao deletar usuário: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erro ao deletar usuário.']);
         }
         exit;
     }
@@ -992,6 +1148,23 @@ $totalCurriculos = $stmt->fetchColumn();
             color: #166534;
             font-weight: 500;
         }
+
+        /* Estilos para tipos de usuário */
+        .user-type {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+        .user-type.admin {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .user-type.analisador {
+            background: #d1fae5;
+            color: #065f46;
+        }
         .timeline-file-box {
             margin-top: 8px;
             padding: 10px;
@@ -1032,13 +1205,16 @@ $totalCurriculos = $stmt->fetchColumn();
                 </div>
 
                 <div class="tabs">
-                    <button class="tab active" onclick="showTab('curriculos')"><i class="fas fa-list"></i> Currículos</button>
-                    <button class="tab" onclick="showTab('interactions')"><i class="fas fa-chart-line"></i> Interações do Formulário</button>
-                    <button class="tab" onclick="showTab('config')"><i class="fas fa-cog"></i> Configurações</button>
-                    <button class="tab" onclick="showTab('tests')"><i class="fas fa-vial"></i> Testes da API</button>
-                    <button class="tab" onclick="showTab('logs')"><i class="fas fa-file-alt"></i> Logs do Sistema</button>
-                    <button class="tab" onclick="showTab('access')"><i class="fas fa-eye"></i> Logs de Acesso</button>
-                </div>
+                     <button class="tab active" onclick="showTab('curriculos')"><i class="fas fa-list"></i> Currículos</button>
+                     <?php if (getUserType() === 'admin'): ?>
+                     <button class="tab" onclick="showTab('interactions')"><i class="fas fa-chart-line"></i> Interações do Formulário</button>
+                     <button class="tab" onclick="showTab('users')"><i class="fas fa-users"></i> Usuários</button>
+                     <button class="tab" onclick="showTab('config')"><i class="fas fa-cog"></i> Configurações</button>
+                     <button class="tab" onclick="showTab('tests')"><i class="fas fa-vial"></i> Testes da API</button>
+                     <button class="tab" onclick="showTab('logs')"><i class="fas fa-file-alt"></i> Logs do Sistema</button>
+                     <button class="tab" onclick="showTab('access')"><i class="fas fa-eye"></i> Logs de Acesso</button>
+                     <?php endif; ?>
+                 </div>
 
                 <!-- Tab Currículos -->
                 <div id="curriculos-tab" class="tab-content active">
@@ -1052,9 +1228,10 @@ $totalCurriculos = $stmt->fetchColumn();
                 </div>
 
                 <!-- Tab Interações do Formulário -->
+                <?php if (getUserType() === 'admin'): ?>
                 <div id="interactions-tab" class="tab-content">
                     <h3><i class="fas fa-chart-line"></i> Análise de Interações do Formulário</h3>
-                    
+
                     <!-- Cards de Estatísticas -->
                     <div class="stats-grid">
                         <div class="stat-card">
@@ -1134,8 +1311,24 @@ $totalCurriculos = $stmt->fetchColumn();
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
+
+                <!-- Tab Usuários -->
+                <div id="users-tab" class="tab-content">
+                    <h3><i class="fas fa-users"></i> Gerenciar Usuários</h3>
+                    <div style="margin-bottom: 20px;">
+                        <button class="btn-primary" onclick="showAddUserModal()"><i class="fas fa-plus"></i> Adicionar Usuário</button>
+                    </div>
+                    <table class="curriculos-table">
+                        <thead><tr><th>Email</th><th>Tipo</th><th>Data de Criação</th><th>Ações</th></tr></thead>
+                        <tbody id="users-tbody">
+                            <!-- Conteúdo carregado via JS -->
+                        </tbody>
+                    </table>
+                </div>
 
                 <!-- Tab Configurações -->
+                <?php if (getUserType() === 'admin'): ?>
                 <div id="config-tab" class="tab-content">
                     <div class="config-note">
                         <h4><i class="fas fa-key"></i> Configurações Gerais</h4>
@@ -1199,8 +1392,10 @@ $totalCurriculos = $stmt->fetchColumn();
                         <div id="configCredentialsSuccess" class="success-message" style="display: none;"></div>
                     </form>
                 </div>
+                <?php endif; ?>
 
                 <!-- Tab Testes -->
+                <?php if (getUserType() === 'admin'): ?>
                 <div id="tests-tab" class="tab-content">
                     <div class="config-note">
                         <h4><i class="fas fa-vial"></i> Testar Envio de Mensagem</h4>
@@ -1221,8 +1416,10 @@ $totalCurriculos = $stmt->fetchColumn();
                         <div id="testResult" class="success-message" style="display: none; margin-top: 15px; white-space: pre-wrap; text-align: left;"></div>
                     </form>
                 </div>
+                <?php endif; ?>
 
                 <!-- Tab Logs -->
+                <?php if (getUserType() === 'admin'): ?>
                 <div id="logs-tab" class="tab-content">
                     <div class="form-section">
                         <h3><i class="fas fa-file-alt"></i> Logs do Sistema</h3>
@@ -1239,8 +1436,10 @@ $totalCurriculos = $stmt->fetchColumn();
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <!-- Tab Access Logs -->
+                <?php if (getUserType() === 'admin'): ?>
                 <div id="access-tab" class="tab-content">
                     <div class="form-section">
                         <h3><i class="fas fa-eye"></i> Logs de Acesso ao Formulário</h3>
@@ -1257,7 +1456,36 @@ $totalCurriculos = $stmt->fetchColumn();
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal para Adicionar Usuário -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="document.getElementById('addUserModal').style.display='none'">&times;</span>
+            <h2>Adicionar Novo Usuário</h2>
+            <form id="addUserForm">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label>Senha</label>
+                    <input type="password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label>Tipo de Usuário</label>
+                    <select name="tipo" required>
+                        <option value="analisador">Analisador</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary">Criar Usuário</button>
+                <div id="addUserSuccess" class="success-message" style="display: none; margin-top: 15px;"></div>
+            </form>
         </div>
     </div>
 
@@ -1288,7 +1516,26 @@ $totalCurriculos = $stmt->fetchColumn();
 
 
     <script>
+        // Tipo de usuário atual
+        const userType = '<?php echo getUserType(); ?>';
+
+        // Função para verificar se usuário pode acessar uma aba
+        function canAccessTab(tabName) {
+            if (userType === 'admin') {
+                return true; // admin acessa tudo
+            } else if (userType === 'analisador') {
+                return tabName === 'curriculos'; // analisador só currículos
+            }
+            return false;
+        }
+
         function showTab(tabName) {
+            // Verificar se usuário pode acessar a aba
+            if (!canAccessTab(tabName)) {
+                alert('Acesso negado: você não tem permissão para acessar esta seção.');
+                return;
+            }
+
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById(tabName + '-tab').classList.add('active');
@@ -1302,6 +1549,8 @@ $totalCurriculos = $stmt->fetchColumn();
                 loadInteractionStats();
                 loadAbandonmentAnalysis();
                 loadInteractions();
+            } else if (tabName === 'users') {
+                loadUsers();
             }
         }
 
@@ -1935,9 +2184,88 @@ $totalCurriculos = $stmt->fetchColumn();
             return div.innerHTML;
         }
 
+        // --- FUNÇÕES DE GERENCIAMENTO DE USUÁRIOS ---
+
+        function showAddUserModal() {
+            document.getElementById('addUserModal').style.display = 'block';
+            document.getElementById('addUserForm').reset();
+            document.getElementById('addUserSuccess').style.display = 'none';
+        }
+
+        // Carregar usuários
+        function loadUsers() {
+            fetch('admin.php?action=getUsers')
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.getElementById('users-tbody');
+                    if (data.success && data.users.length > 0) {
+                        tbody.innerHTML = data.users.map(u => `
+                            <tr>
+                                <td>${u.email}</td>
+                                <td><span class="user-type ${u.tipo}">${u.tipo === 'admin' ? 'Administrador' : 'Analisador'}</span></td>
+                                <td>${new Date(u.created_at).toLocaleString('pt-BR')}</td>
+                                <td>
+                                    ${u.id != <?php echo $_SESSION['user_id']; ?> ? `<button class="btn-remove btn-small" onclick="deleteUser(${u.id}, this)"><i class="fas fa-trash"></i> Deletar</button>` : '<em>Você</em>'}
+                                </td>
+                            </tr>
+                        `).join('');
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="4">Nenhum usuário encontrado.</td></tr>';
+                    }
+                });
+        }
+
+        // Formulário de adicionar usuário
+        document.getElementById('addUserForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            formData.append('action', 'addUser');
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    const msgDiv = document.getElementById('addUserSuccess');
+                    msgDiv.textContent = data.message;
+                    msgDiv.style.display = 'block';
+                    if (data.success) {
+                        loadUsers();
+                        setTimeout(() => {
+                            document.getElementById('addUserModal').style.display = 'none';
+                        }, 2000);
+                    }
+                });
+        });
+
+        function deleteUser(id, element) {
+            if (!confirm('Tem certeza que deseja deletar este usuário? Esta ação não pode ser desfeita.')) {
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('action', 'deleteUser');
+            formData.append('id', id);
+            formData.append('csrf_token', '<?php echo $_SESSION['csrf_token']; ?>');
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const row = element.closest('tr');
+                        row.style.transition = 'opacity 0.5s';
+                        row.style.opacity = '0';
+                        setTimeout(() => row.remove(), 500);
+                    } else {
+                        alert('Erro: ' + data.message);
+                    }
+                });
+        }
+
         // Carregamento inicial
         document.addEventListener('DOMContentLoaded', function() {
             loadCurriculos();
+            if (userType === 'admin') {
+                loadUsers();
+            }
         });
     </script>
 </body>
