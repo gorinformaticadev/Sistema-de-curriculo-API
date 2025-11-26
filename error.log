@@ -192,3 +192,6 @@
 [2025-11-26 14:47:24] [WARNING] [IP: ::1] Senha incorreta para usuário: gilsonoliverr@gmail.com
 [2025-11-26 14:47:30] [INFO] [IP: ::1] Tentativa de login para email: atendimentogor@gmail.com
 [2025-11-26 14:47:30] [WARNING] [IP: ::1] Usuário não encontrado: atendimentogor@gmail.com
+[2025-11-26 15:09:36] [INFO] [IP: ::1] Tentativa de login para email: gilsonoliverr@gmail.com
+[2025-11-26 15:09:36] [INFO] [IP: ::1] Usuário encontrado: gilsonoliverr@gmail.com, tipo: admin, senha hash: $2y$10$Jvu...
+[2025-11-26 15:09:36] [INFO] [IP: ::1] Login bem-sucedido para usuário gilsonoliverr@gmail.com (tipo: admin)
