@@ -173,3 +173,22 @@
 [2025-11-26 14:32:45] [ERROR] [IP: ::1] DB_CONNECT_FAILURE: Falha na conexão com o banco de dados: SQLSTATE[HY000] [1049] Unknown database 'cur'
 [2025-11-26 14:33:25] [ERROR] [IP: ::1] DB_CONNECT_FAILURE: Falha na conexão com o banco de dados: SQLSTATE[HY000] [1049] Unknown database 'cur'
 [2025-11-26 14:33:41] [ERROR] [IP: ::1] DB_CONNECT_FAILURE: Falha na conexão com o banco de dados: SQLSTATE[HY000] [1049] Unknown database 'cur'
+[2025-11-26 14:39:39] [ERROR] [IP: ::1] DB_CONNECT_FAILURE: Falha na conexão com o banco de dados: SQLSTATE[HY000] [2002] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente
+[2025-11-26 14:46:35] [INFO] [IP: ::1] Tentativa de login para email: atendimentogor@gmail.com
+[2025-11-26 14:46:35] [WARNING] [IP: ::1] Usuário não encontrado: atendimentogor@gmail.com
+[2025-11-26 14:46:39] [INFO] [IP: ::1] Tentativa de login para email: gilsonoliverr@gmail.com
+[2025-11-26 14:46:39] [INFO] [IP: ::1] Usuário encontrado: gilsonoliverr@gmail.com, tipo: admin, senha hash: $2y$10$2K6...
+[2025-11-26 14:46:39] [WARNING] [IP: ::1] Senha incorreta para usuário: gilsonoliverr@gmail.com
+[2025-11-26 14:46:47] [INFO] [IP: ::1] Tentativa de login para email: gilsonoliverr@gmail.com
+[2025-11-26 14:46:47] [INFO] [IP: ::1] Usuário encontrado: gilsonoliverr@gmail.com, tipo: admin, senha hash: $2y$10$2K6...
+[2025-11-26 14:46:47] [WARNING] [IP: ::1] Senha incorreta para usuário: gilsonoliverr@gmail.com
+[2025-11-26 14:46:53] [INFO] [IP: ::1] Tentativa de login para email: atendimentogor@gmail.com
+[2025-11-26 14:46:53] [WARNING] [IP: ::1] Usuário não encontrado: atendimentogor@gmail.com
+[2025-11-26 14:46:59] [INFO] [IP: ::1] Tentativa de login para email: gilsonoliverr@gmail.com
+[2025-11-26 14:46:59] [INFO] [IP: ::1] Usuário encontrado: gilsonoliverr@gmail.com, tipo: admin, senha hash: $2y$10$2K6...
+[2025-11-26 14:46:59] [WARNING] [IP: ::1] Senha incorreta para usuário: gilsonoliverr@gmail.com
+[2025-11-26 14:47:24] [INFO] [IP: ::1] Tentativa de login para email: gilsonoliverr@gmail.com
+[2025-11-26 14:47:24] [INFO] [IP: ::1] Usuário encontrado: gilsonoliverr@gmail.com, tipo: admin, senha hash: $2y$10$2K6...
+[2025-11-26 14:47:24] [WARNING] [IP: ::1] Senha incorreta para usuário: gilsonoliverr@gmail.com
+[2025-11-26 14:47:30] [INFO] [IP: ::1] Tentativa de login para email: atendimentogor@gmail.com
+[2025-11-26 14:47:30] [WARNING] [IP: ::1] Usuário não encontrado: atendimentogor@gmail.com

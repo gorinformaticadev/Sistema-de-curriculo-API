@@ -1,8 +1,13 @@
 <?php
-// Interactive installer for the system with modern design
+/**
+ * Instalador Inteligente com Sistema de Migração
+ * Permite atualizações seguras sem perda de dados
+ */
+
+require_once 'includes/migration.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $installMode = $_POST['install_mode'] ?? 'install'; // 'install' ou 'update'
+    $installMode = $_POST['install_mode'] ?? 'install';
     $dbName = trim($_POST['db_name'] ?? '');
     $dbUser = trim($_POST['db_user'] ?? 'root');
     $dbPass = trim($_POST['db_pass'] ?? '');
@@ -10,6 +15,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $adminPass = trim($_POST['admin_pass'] ?? '');
 
     $errors = [];
+    $warnings = [];
+    $success = false;
+    $steps = [];
+    $migrationResult = null;
 
     if (!$dbName) {
         $errors[] = "Nome do banco de dados é obrigatório.";
@@ -27,116 +36,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (count($errors) === 0) {
         try {
+            // Conectar ao MySQL sem especificar banco
             $pdo_init = new PDO("mysql:host=localhost", $dbUser, $dbPass);
             $pdo_init->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-            $steps = [];
-
             if ($installMode === 'install') {
-                // Create database
+                // Verificar se banco já existe
+                $stmt = $pdo_init->query("SHOW DATABASES LIKE '$dbName'");
+                if ($stmt->rowCount() > 0) {
+                    $warnings[] = "O banco de dados '$dbName' já existe. Em modo de instalação, será recriado.";
+                }
+                
+                // Criar banco de dados
                 $pdo_init->exec("CREATE DATABASE IF NOT EXISTS `$dbName` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
-                $steps[] = "Banco de dados '$dbName' verificado/criado com sucesso.";
+                $steps[] = "✅ Banco de dados '$dbName' verificado/criado com sucesso.";
             } else {
-                $steps[] = "Modo de atualização: usando banco de dados existente '$dbName'.";
+                // Modo atualização - verificar se banco existe
+                $stmt = $pdo_init->query("SHOW DATABASES LIKE '$dbName'");
+                if ($stmt->rowCount() == 0) {
+                    throw new Exception("O banco de dados '$dbName' não existe. Para uma nova instalação, selecione 'Nova Instalação'.");
+                }
+                $steps[] = "✅ Banco de dados existente '$dbName' verificado.";
             }
 
-            // Connect to database
+            // Conectar ao banco de dados específico
             $pdo = new PDO("mysql:host=localhost;dbname=$dbName", $dbUser, $dbPass);
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-            // Create tables
-            $sql_usuarios = "
-            CREATE TABLE IF NOT EXISTS `usuarios` (
-              `id` INT AUTO_INCREMENT PRIMARY KEY,
-              `email` VARCHAR(255) NOT NULL UNIQUE,
-              `senha` VARCHAR(255) NOT NULL,
-              `criado_em` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB;
-            ";
-            $pdo->exec($sql_usuarios);
-            $steps[] = "Tabela 'usuarios' verificada/criada com sucesso.";
+            // Executar migrações se estiver em modo update
+            if ($installMode === 'update') {
+                $migration = new DatabaseMigration($pdo);
+                $currentVersion = $migration->getCurrentVersion();
+                
+                $steps[] = "📊 Versão atual do banco: $currentVersion";
+                $steps[] = "🔄 Iniciando processo de migração...";
+                
+                try {
+                    $migrationResult = $migration->migrate();
+                    
+                    if ($migrationResult['success']) {
+                        $steps[] = "✅ Migrações concluídas com sucesso!";
+                        
+                        if (!empty($migrationResult['applied_migrations'])) {
+                            foreach ($migrationResult['applied_migrations'] as $migration) {
+                                $steps[] = "  📦 Versão {$migration['version']}: {$migration['description']}";
+                            }
+                        } else {
+                            $steps[] = "ℹ️ Sistema já está na versão mais recente.";
+                        }
+                    } else {
+                        throw new Exception("Erro durante as migrações: " . implode(", ", $migrationResult['errors']));
+                    }
+                    
+                } catch (Exception $e) {
+                    $steps[] = "❌ Erro durante migração: " . $e->getMessage();
+                    throw $e;
+                }
+                
+            } else {
+                // Modo instalação - criar estrutura inicial
+                $migration = new DatabaseMigration($pdo);
+                $migrationResult = $migration->migrate();
+                $steps[] = "✅ Estrutura inicial do banco criada.";
+            }
 
-            $sql_config = "
-            CREATE TABLE IF NOT EXISTS `config` (
-              `id` INT AUTO_INCREMENT PRIMARY KEY,
-              `chave` VARCHAR(255) NOT NULL UNIQUE,
-              `valor` TEXT
-            ) ENGINE=InnoDB;
-            ";
-            $pdo->exec($sql_config);
-            $steps[] = "Tabela 'config' verificada/criada com sucesso.";
-
-            $sql_curriculos = "
-            CREATE TABLE IF NOT EXISTS `curriculos` (
-                `id` INT AUTO_INCREMENT PRIMARY KEY,
-                `nome` VARCHAR(255) NOT NULL,
-                `data_nascimento` DATE NOT NULL,
-                `estado_civil` VARCHAR(50),
-                `telefone` VARCHAR(255),
-                `is_whatsapp` TINYINT(1) DEFAULT 0,
-                `email` VARCHAR(255),
-                `facebook` VARCHAR(255),
-                `instagram` VARCHAR(255),
-                `endereco` TEXT,
-                `cidade` VARCHAR(255),
-                `estado` VARCHAR(255),
-                `escolaridade` VARCHAR(255),
-                `estudando` TINYINT(1) DEFAULT 0,
-                `periodo_estudo` VARCHAR(50),
-                `possui_cursos` TINYINT(1) DEFAULT 0,
-                `cursos` TEXT,
-                `possui_experiencia` TINYINT(1) DEFAULT 0,
-                `experiencias` TEXT,
-                `motivacao` TEXT,
-                `arquivo_curriculo` VARCHAR(255),
-                `arquivo_foto` VARCHAR(255),
-                `ip_cadastro` VARCHAR(45),
-                `data_cadastro` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB;
-            ";
-            $pdo->exec($sql_curriculos);
-            $steps[] = "Tabela 'curriculos' verificada/criada com sucesso.";
-
-            // Criar tabela de interações do formulário (NOVA)
-            $sql_interactions = "
-            CREATE TABLE IF NOT EXISTS `form_interactions` (
-                `id` INT AUTO_INCREMENT PRIMARY KEY,
-                `session_id` VARCHAR(255) NOT NULL,
-                `ip` VARCHAR(45) NOT NULL,
-                `user_agent` TEXT,
-                `browser` VARCHAR(100),
-                `os` VARCHAR(100),
-                `device` VARCHAR(50),
-                `nome_completo` VARCHAR(255) DEFAULT NULL,
-                `ultimo_campo` VARCHAR(100),
-                `acao` VARCHAR(50),
-                `valor_campo` TEXT,
-                `timestamp` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                INDEX `idx_session` (`session_id`),
-                INDEX `idx_ip` (`ip`),
-                INDEX `idx_timestamp` (`timestamp`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            ";
-            $pdo->exec($sql_interactions);
-            $steps[] = "Tabela 'form_interactions' verificada/criada com sucesso.";
-
-            // Insert admin user if not exists (apenas no modo install)
+            // Inserir usuário admin (apenas em modo install)
             if ($installMode === 'install' && $adminEmail && $adminPass) {
                 $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE email = ?");
                 $stmt->execute([$adminEmail]);
                 if ($stmt->rowCount() == 0) {
                     $senha_hash = password_hash($adminPass, PASSWORD_DEFAULT);
-                    $stmt = $pdo->prepare("INSERT INTO usuarios (email, senha) VALUES (?, ?)");
+                    $stmt = $pdo->prepare("INSERT INTO usuarios (email, senha, tipo) VALUES (?, ?, 'admin')");
                     $stmt->execute([$adminEmail, $senha_hash]);
-                    $steps[] = "Usuário administrador '$adminEmail' inserido com sucesso.";
+                    $steps[] = "👤 Usuário administrador '$adminEmail' criado com sucesso.";
                 } else {
-                    $steps[] = "Usuário administrador '$adminEmail' já existe.";
+                    $steps[] = "ℹ️ Usuário administrador '$adminEmail' já existe.";
                 }
-            } else if ($installMode === 'update') {
-                $steps[] = "Modo de atualização: credenciais de admin não foram alteradas.";
             }
 
-            // Insert default config if not exists
+            // Inserir configurações padrão se não existirem
             $configs_iniciais = [
                 'api_token' => '',
                 'api_url' => 'https://app.whapichat.com.br:443/backend/api/messages/send',
@@ -152,39 +130,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt_check = $pdo->prepare("SELECT id FROM config WHERE chave = ?");
             $stmt_insert = $pdo->prepare("INSERT INTO config (chave, valor) VALUES (?, ?)");
+            $configs_added = 0;
 
             foreach ($configs_iniciais as $chave => $valor) {
                 $stmt_check->execute([$chave]);
                 if ($stmt_check->rowCount() == 0) {
                     $stmt_insert->execute([$chave, $valor]);
-                    $steps[] = "Configuração padrão '{$chave}' inserida com sucesso.";
+                    $configs_added++;
+                }
+            }
+            
+            if ($configs_added > 0) {
+                $steps[] = "⚙️ $configs_added configuração(ões) padrão inserida(s).";
+            } else {
+                $steps[] = "ℹ️ Configurações padrão já existem.";
+            }
+
+            // Atualizar arquivo de conexão se existir e for gravável
+            $dbConnectPath = __DIR__ . '/db_connect.php';
+            if (file_exists($dbConnectPath) && is_writable($dbConnectPath)) {
+                $dbConnectContent = file_get_contents($dbConnectPath);
+                $updated = false;
+
+                // Substituir configurações mantendo outras linhas intactas
+                $patterns = [
+                    "/define\('DB_USER',\s*'[^']*'\);/" => "define('DB_USER', '" . addslashes($dbUser) . "');",
+                    "/define\('DB_PASS',\s*'[^']*'\);/" => "define('DB_PASS', '" . addslashes($dbPass) . "');",
+                    "/define\('DB_NAME',\s*'[^']*'\);/" => "define('DB_NAME', '" . addslashes($dbName) . "');"
+                ];
+
+                foreach ($patterns as $pattern => $replacement) {
+                    if (preg_match($pattern, $dbConnectContent)) {
+                        $dbConnectContent = preg_replace($pattern, $replacement, $dbConnectContent);
+                        $updated = true;
+                    }
+                }
+
+                if ($updated) {
+                    file_put_contents($dbConnectPath, $dbConnectContent);
+                    $steps[] = "🔧 Arquivo db_connect.php atualizado com as novas configurações.";
+                }
+            } else {
+                $steps[] = "⚠️ Arquivo db_connect.php não encontrado ou sem permissão de escrita.";
+            }
+
+            // Informações sobre o sistema atualizado
+            if ($installMode === 'update' && $migrationResult) {
+                $steps[] = "📋 Versão final do banco: " . $migrationResult['current_version'];
+                if (!empty($migrationResult['applied_migrations'])) {
+                    $steps[] = "🚀 Sistema atualizado para a versão mais recente!";
                 } else {
-                    $steps[] = "Configuração '{$chave}' já existe.";
+                    $steps[] = "✅ Sistema já estava atualizado.";
                 }
             }
 
             $success = true;
 
-            // Atualizar o arquivo db_connect.php com as configurações do banco de dados fornecidas
-            $dbConnectPath = __DIR__ . '/db_connect.php';
-            if (is_writable($dbConnectPath)) {
-                $dbConnectContent = file_get_contents($dbConnectPath);
-
-                // Substituir as definições de configuração do banco de dados
-                $dbConnectContent = str_replace("define('DB_HOST', 'localhost');", "define('DB_HOST', 'localhost');", $dbConnectContent);
-                $dbConnectContent = str_replace("define('DB_USER', 'root');", "define('DB_USER', '" . addslashes($dbUser) . "');", $dbConnectContent);
-                $dbConnectContent = str_replace("define('DB_PASS', '');", "define('DB_PASS', '" . addslashes($dbPass) . "');", $dbConnectContent);
-                $dbConnectContent = str_replace("define('DB_NAME', 'curriculos');", "define('DB_NAME', '" . addslashes($dbName) . "');", $dbConnectContent);
-
-                file_put_contents($dbConnectPath, $dbConnectContent);
-                $steps[] = "Arquivo db_connect.php atualizado com as configurações do banco de dados.";
-            } else {
-                $steps[] = "Não foi possível atualizar o arquivo db_connect.php. Verifique as permissões.";
-            }
-
         } catch (PDOException $e) {
-            $errors[] = "Erro durante a instalação: " . $e->getMessage();
-            $success = false;
+            $errors[] = "Erro de banco de dados: " . $e->getMessage();
+            $steps[] = "❌ Falha na operação: " . $e->getMessage();
+        } catch (Exception $e) {
+            $errors[] = "Erro durante a operação: " . $e->getMessage();
+            $steps[] = "❌ Erro: " . $e->getMessage();
         }
     }
 }
@@ -195,182 +202,378 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Instalador do Sistema de Currículos</title>
+    <title>Instalador do Sistema de Currículos v2.0</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f0f2f5;
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            padding: 20px;
         }
+        
         .container {
             background: white;
-            padding: 30px 40px;
-            border-radius: 12px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-            width: 400px;
-            max-width: 90%;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            width: 100%;
+            max-width: 500px;
+            padding: 40px;
+            position: relative;
+            overflow: hidden;
         }
+        
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+        
         h1 {
-            margin-bottom: 20px;
-            color: #333;
             text-align: center;
+            color: #2d3748;
+            margin-bottom: 30px;
+            font-size: 1.8rem;
+            font-weight: 700;
         }
+        
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
         label {
             display: block;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             font-weight: 600;
-            color: #555;
+            color: #4a5568;
+            font-size: 0.9rem;
         }
+        
         input[type="text"],
         input[type="email"],
-        input[type="password"] {
+        input[type="password"],
+        select {
             width: 100%;
-            padding: 10px 12px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
             border-radius: 8px;
             font-size: 1rem;
-            transition: border-color 0.3s ease;
+            transition: all 0.3s ease;
+            background: #fafafa;
         }
-        input[type="text"]:focus,
-        input[type="email"]:focus,
-        input[type="password"]:focus {
-            border-color: #007bff;
+        
+        input:focus,
+        select:focus {
             outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
+        
+        .mode-selector {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .mode-option {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        
+        .mode-option:last-child {
+            margin-bottom: 0;
+        }
+        
+        .mode-option input[type="radio"] {
+            margin-right: 10px;
+            transform: scale(1.2);
+        }
+        
+        .mode-option .option-content {
+            flex: 1;
+        }
+        
+        .mode-option .option-title {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+        
+        .mode-option .option-desc {
+            font-size: 0.85rem;
+            color: #718096;
+        }
+        
         button {
             width: 100%;
-            padding: 12px;
-            background: #007bff;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
             border-radius: 8px;
             color: white;
             font-size: 1.1rem;
+            font-weight: 600;
             cursor: pointer;
-            transition: background 0.3s ease;
+            transition: all 0.3s ease;
+            margin-top: 10px;
         }
+        
         button:hover {
-            background: #0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
         }
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 12px;
+        
+        button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .alert {
+            padding: 15px;
             border-radius: 8px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
         }
-        .success {
-            background: #d4edda;
-            color: #155724;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 15px;
+        
+        .alert-error {
+            background: #fed7d7;
+            color: #c53030;
+            border-left-color: #c53030;
         }
-        ul {
+        
+        .alert-success {
+            background: #c6f6d5;
+            color: #22543d;
+            border-left-color: #38a169;
+        }
+        
+        .alert-warning {
+            background: #fefcbf;
+            color: #744210;
+            border-left-color: #d69e2e;
+        }
+        
+        .steps {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+        
+        .steps ul {
             list-style: none;
-            padding-left: 0;
+            padding: 0;
         }
-        li {
+        
+        .steps li {
             margin-bottom: 8px;
-            padding-left: 20px;
-            position: relative;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.9rem;
         }
-        li::before {
-            content: "✔️";
-            position: absolute;
-            left: 0;
-            top: 0;
-        }
-        a {
+        
+        .back-link {
             display: inline-block;
             margin-top: 15px;
+            color: #667eea;
             text-decoration: none;
-            color: #007bff;
             font-weight: 600;
         }
-        a:hover {
+        
+        .back-link:hover {
             text-decoration: underline;
+        }
+        
+        .version-info {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+            color: #4a5568;
+            text-align: center;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .footer-note {
+            text-align: center;
+            margin-top: 30px;
+            color: #a0aec0;
+            font-size: 0.8rem;
+        }
+        
+        .footer-note code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #4a5568;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Instalador do Sistema de Currículos</h1>
+        <h1>🚀 Instalador do Sistema</h1>
+        <div class="subtitle">Versão 2.0 - Com Sistema de Migração Inteligente</div>
 
 <?php if ($_SERVER['REQUEST_METHOD'] === 'POST'): ?>
     <?php if (!empty($errors)): ?>
-        <div class="error">
-            <h2>Erros encontrados:</h2>
-            <ul>
+        <div class="alert alert-error">
+            <h3>❌ Erros Encontrados:</h3>
+            <ul style="margin-top: 10px;">
                 <?php foreach ($errors as $error): ?>
                     <li><?php echo htmlspecialchars($error); ?></li>
                 <?php endforeach; ?>
             </ul>
-            <a href="install.php">Voltar</a>
+            <a href="install.php" class="back-link">← Voltar</a>
         </div>
     <?php elseif ($success): ?>
-        <div class="success">
-            <h2>Instalação concluída com sucesso!</h2>
-            <ul>
-                <?php foreach ($steps as $step): ?>
-                    <li><?php echo htmlspecialchars($step); ?></li>
-                <?php endforeach; ?>
+        <div class="alert alert-success">
+            <h2>🎉 <?php echo $installMode === 'install' ? 'Instalação' : 'Atualização'; ?> Concluída!</h2>
+            <div class="steps">
+                <h4>Etapas Realizadas:</h4>
+                <ul>
+                    <?php foreach ($steps as $step): ?>
+                        <li><?php echo htmlspecialchars($step); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+            <div class="version-info">
+                <?php if ($migrationResult): ?>
+                    <strong>Versão Final:</strong> <?php echo htmlspecialchars($migrationResult['current_version']); ?>
+                    <?php if (!empty($migrationResult['applied_migrations'])): ?>
+                        <br><small>🚀 Sistema atualizado com sucesso!</small>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </div>
+            <p><strong>Próximos passos:</strong></p>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <?php if ($installMode === 'install'): ?>
+                    <li>Acesse o painel administrativo em <a href="admin.php" style="color: #667eea;">admin.php</a></li>
+                    <li>Configure as APIs e SMTP nas configurações</li>
+                <?php else: ?>
+                    <li>Acesse o painel administrativo em <a href="admin.php" style="color: #667eea;">admin.php</a></li>
+                    <li>Verifique se todas as funcionalidades estão funcionando</li>
+                <?php endif; ?>
+                <li>Por segurança, remova ou renomeie o arquivo <code>install.php</code></li>
             </ul>
-            <p>Por segurança, remova ou renomeie o arquivo <code>install.php</code> agora.</p>
         </div>
     <?php endif; ?>
 <?php else: ?>
     <form method="POST" action="install.php" id="installForm">
-        <label for="install_mode">Modo de Instalação:</label>
-        <select id="install_mode" name="install_mode" onchange="toggleAdminFields()" style="width: 100%; padding: 10px 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem;">
-            <option value="install">Nova Instalação (Criar tudo do zero)</option>
-            <option value="update">Atualizar Sistema (Manter dados existentes)</option>
-        </select>
-
-        <label for="db_name">Nome do Banco de Dados:</label>
-        <input type="text" id="db_name" name="db_name" required />
-
-        <label for="db_user">Usuário do Banco de Dados:</label>
-        <input type="text" id="db_user" name="db_user" value="root" required />
-
-        <label for="db_pass">Senha do Banco de Dados:</label>
-        <input type="password" id="db_pass" name="db_pass" />
-
-        <div id="adminFields">
-            <label for="admin_email">Email do Usuário Admin:</label>
-            <input type="email" id="admin_email" name="admin_email" />
-
-            <label for="admin_pass">Senha do Usuário Admin:</label>
-            <input type="password" id="admin_pass" name="admin_pass" />
+        <div class="version-info">
+            <strong>💡 Dica:</strong> Use "Atualizar Sistema" para manter todos os dados existentes
+        </div>
+        
+        <div class="form-group">
+            <label>Modo de Instalação:</label>
+            <div class="mode-selector">
+                <label class="mode-option">
+                    <input type="radio" name="install_mode" value="install" id="installRadio" onchange="toggleMode()" />
+                    <div class="option-content">
+                        <div class="option-title">🆕 Nova Instalação</div>
+                        <div class="option-desc">Cria tudo do zero. Remove dados existentes!</div>
+                    </div>
+                </label>
+                <label class="mode-option">
+                    <input type="radio" name="install_mode" value="update" id="updateRadio" onchange="toggleMode()" checked />
+                    <div class="option-content">
+                        <div class="option-title">🔄 Atualizar Sistema</div>
+                        <div class="option-desc">Mantém dados existentes. Recomendado!</div>
+                    </div>
+                </label>
+            </div>
         </div>
 
-        <button type="submit">Instalar</button>
+        <div class="form-group">
+            <label for="db_name">Nome do Banco de Dados:</label>
+            <input type="text" id="db_name" name="db_name" required 
+                   value="<?php echo htmlspecialchars($_POST['db_name'] ?? 'gor_informatica'); ?>" />
+        </div>
+
+        <div class="form-group">
+            <label for="db_user">Usuário do Banco de Dados:</label>
+            <input type="text" id="db_user" name="db_user" value="root" required />
+        </div>
+
+        <div class="form-group">
+            <label for="db_pass">Senha do Banco de Dados:</label>
+            <input type="password" id="db_pass" name="db_pass" />
+        </div>
+
+        <div id="adminFields">
+            <div class="form-group">
+                <label for="admin_email">Email do Usuário Admin:</label>
+                <input type="email" id="admin_email" name="admin_email" />
+            </div>
+
+            <div class="form-group">
+                <label for="admin_pass">Senha do Usuário Admin:</label>
+                <input type="password" id="admin_pass" name="admin_pass" />
+            </div>
+        </div>
+
+        <button type="submit">
+            <span id="buttonText">🚀 Instalar Sistema</span>
+        </button>
     </form>
 
+    <div class="footer-note">
+        <p>✨ Sistema de Migração v2.0 - Atualizações sem perda de dados</p>
+        <p>Por segurança, remova o arquivo <code>install.php</code> após a instalação</p>
+    </div>
+
     <script>
-        function toggleAdminFields() {
-            const mode = document.getElementById('install_mode').value;
+        function toggleMode() {
+            const installMode = document.querySelector('input[name="install_mode"]:checked').value;
             const adminFields = document.getElementById('adminFields');
             const adminEmail = document.getElementById('admin_email');
             const adminPass = document.getElementById('admin_pass');
+            const buttonText = document.getElementById('buttonText');
             
-            if (mode === 'update') {
+            if (installMode === 'update') {
                 adminFields.style.display = 'none';
                 adminEmail.removeAttribute('required');
                 adminPass.removeAttribute('required');
+                buttonText.textContent = '🔄 Atualizar Sistema';
             } else {
                 adminFields.style.display = 'block';
                 adminEmail.setAttribute('required', 'required');
                 adminPass.setAttribute('required', 'required');
+                buttonText.textContent = '🚀 Instalar Sistema';
             }
         }
+        
+        // Inicializar modo
+        toggleMode();
     </script>
-    <?php endif; ?>
-</div>
+<?php endif; ?>
+    </div>
 </body>
 </html>
