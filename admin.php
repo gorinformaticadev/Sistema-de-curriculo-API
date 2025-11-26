@@ -211,7 +211,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'getCurriculos' && canAccessAc
 
     $whereClause = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
 
-    $stmt = $pdo->prepare("SELECT id, nome, telefone, email, cidade, data_cadastro, status, visualizado, data_visualizacao FROM curriculos {$whereClause} ORDER BY data_cadastro DESC");
+    $stmt = $pdo->prepare("SELECT id, nome, telefone, email, cidade, data_cadastro, status, visualizado, data_visualizacao, is_whatsapp FROM curriculos {$whereClause} ORDER BY data_cadastro DESC");
     $stmt->execute($params);
     $curriculos = $stmt->fetchAll();
 
@@ -1887,7 +1887,7 @@ $totalCurriculos = $stmt->fetchColumn();
                                             <option value="classificado" ${c.status === 'classificado' ? 'selected' : ''}>Classificado</option>
                                             <option value="arquivado" ${c.status === 'arquivado' ? 'selected' : ''}>Arquivado</option>
                                         </select>
-                                        ${c.status === 'classificado' && c.is_whatsapp ? `<button class="btn-small" onclick="openWhatsAppModal(${c.id}, '${c.nome}', '${c.telefone}')" style="margin-left: 5px; background: #25d366; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;" title="Enviar WhatsApp"><i class="fab fa-whatsapp"></i></button>` : ''}
+                                        ${c.is_whatsapp ? `<button class="btn-small" onclick="openWhatsAppModal(${c.id}, '${c.nome}', '${c.telefone}')" style="margin-left: 5px; background: #25d366; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;" title="Enviar WhatsApp"><i class="fab fa-whatsapp"></i></button>` : ''}
                                         ${userType === 'admin' ? `<button class="btn-remove btn-small" onclick="deleteCurriculo(${c.id}, this)" style="margin-left: 5px;"><i class="fas fa-trash"></i> Deletar</button>` : ''}
                                     </td>
                                 </tr>
@@ -2284,10 +2284,11 @@ $totalCurriculos = $stmt->fetchColumn();
 
                                 <div style="margin-bottom: 15px;">
                                     <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #374151;">Mensagem:</label>
-                                    <textarea id="whatsappMessage" rows="4" placeholder="Digite a mensagem para enviar via WhatsApp..." style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; resize: vertical;">Olá ${c.nome}!
+                                    <textarea id="whatsappMessage" rows="4" placeholder="Digite a mensagem para enviar via WhatsApp..." style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; resize: vertical;">Olá *${c.nome}*!
 
 Seu currículo foi classificado e estamos interessados em seu perfil.
 Gostaríamos de agendar uma conversa para discutir oportunidades.
+Estaria disponível para uma chamada nos próximos dias?
 
 Atenciosamente,
 Equipe de RH</textarea>
@@ -2803,7 +2804,7 @@ Equipe de RH</textarea>
 
                 <div style="margin-bottom: 20px;">
                     <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">Mensagem:</label>
-                    <textarea id="quickWhatsAppMessage" rows="4" placeholder="Digite sua mensagem..." style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-family: inherit; resize: vertical;">Olá ${nome}!
+                    <textarea id="quickWhatsAppMessage" rows="4" placeholder="Digite sua mensagem..." style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-family: inherit; resize: vertical;">Olá *${nome}*!
 
 Gostaríamos de conversar sobre seu currículo.
 Podemos agendar uma conversa?

@@ -260,3 +260,10 @@
 [2025-11-26 18:26:20] [WARNING] [IP: ::1] Falha ao enviar notificação por email
 [2025-11-26 18:27:17] [INFO] [IP: ::1] Status do currículo ID 2 alterado para 'classificado' pelo usuário atendimentogor@gmail.com
 [2025-11-26 18:35:48] [INFO] [IP: ::1] Status do currículo ID 1 alterado para 'pendente' pelo usuário atendimentogor@gmail.com
+[2025-11-26 18:38:34] [INFO] [IP: ::1] Status do currículo ID 2 alterado para 'pendente_novo' pelo usuário atendimentogor@gmail.com
+[2025-11-26 18:38:39] [INFO] [IP: ::1] Status do currículo ID 2 alterado para 'pendente' pelo usuário atendimentogor@gmail.com
+[2025-11-26 18:38:41] [INFO] [IP: ::1] Status do currículo ID 2 alterado para 'classificado' pelo usuário atendimentogor@gmail.com
+[2025-11-26 18:38:44] [INFO] [IP: ::1] Status do currículo ID 1 alterado para 'classificado' pelo usuário atendimentogor@gmail.com
+[2025-11-26 18:40:46] [INFO] [IP: ::1] Tentativa de login para email: gilsonoliverr@gmail.com
+[2025-11-26 18:40:46] [INFO] [IP: ::1] Usuário encontrado: gilsonoliverr@gmail.com, tipo: admin, senha hash: $2y$10$Jvu...
+[2025-11-26 18:40:46] [INFO] [IP: ::1] Login bem-sucedido para usuário gilsonoliverr@gmail.com (tipo: admin)
