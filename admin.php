@@ -1772,6 +1772,59 @@ $totalCurriculos = $stmt->fetchColumn();
                     loadCurriculos();
                 });
         }
+
+        // Função para alterar status do currículo a partir do modal
+        function changeStatusFromModal(curriculoId, newStatus) {
+            const statusMessage = document.getElementById('statusUpdateMessage');
+            const statusSelect = document.getElementById('curriculoStatus');
+
+            // Desabilitar select durante a atualização
+            statusSelect.disabled = true;
+            statusMessage.textContent = 'Atualizando...';
+            statusMessage.style.color = '#6b7280';
+
+            const formData = new FormData();
+            formData.append('action', 'updateCurriculoStatus');
+            formData.append('id', curriculoId);
+            formData.append('status', newStatus);
+
+            // Pegar token CSRF
+            const csrfToken = document.querySelector('input[name="csrf_token"]');
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken.value);
+            }
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        statusMessage.textContent = 'Status atualizado com sucesso!';
+                        statusMessage.style.color = '#10b981';
+                        // Recarregar lista para atualizar visual
+                        loadCurriculos();
+                        // Reabilitar select após 2 segundos
+                        setTimeout(() => {
+                            statusSelect.disabled = false;
+                            statusMessage.textContent = '';
+                        }, 2000);
+                    } else {
+                        statusMessage.textContent = 'Erro: ' + data.message;
+                        statusMessage.style.color = '#ef4444';
+                        statusSelect.disabled = false;
+                        // Reverter seleção em caso de erro
+                        // Como não sabemos o status anterior, vamos recarregar o modal
+                        setTimeout(() => {
+                            viewCurriculo(curriculoId);
+                        }, 2000);
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao alterar status:', err);
+                    statusMessage.textContent = 'Erro de conexão';
+                    statusMessage.style.color = '#ef4444';
+                    statusSelect.disabled = false;
+                });
+        }
         
         // Salvar Config API (apenas para admin)
         const apiConfigForm = document.getElementById('apiConfigForm');
@@ -2025,7 +2078,26 @@ $totalCurriculos = $stmt->fetchColumn();
                             `).join('');
                         }
 
+                        const statusOptions = [
+                            {value: 'pendente_novo', label: 'Pendente - Novo'},
+                            {value: 'pendente', label: 'Pendente'},
+                            {value: 'classificado', label: 'Classificado'},
+                            {value: 'arquivado', label: 'Arquivado'}
+                        ];
+
+                        const statusSelect = statusOptions.map(option =>
+                            `<option value="${option.value}" ${c.status === option.value ? 'selected' : ''}>${option.label}</option>`
+                        ).join('');
+
                         modalBody.innerHTML = `
+                            <div style="margin-bottom: 20px; padding: 15px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                                <h4 style="margin: 0 0 10px 0; color: #1e40af;"><i class="fas fa-tag"></i> Status do Currículo</h4>
+                                <select id="curriculoStatus" onchange="changeStatusFromModal(${c.id}, this.value)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white; font-size: 14px;">
+                                    ${statusSelect}
+                                </select>
+                                <span id="statusUpdateMessage" style="margin-left: 10px; font-size: 14px;"></span>
+                            </div>
+
                             <h3><i class="fas fa-user"></i> Dados Pessoais</h3>
                             <p><strong>Nome:</strong> ${c.nome}</p>
                             <p><strong>Data de Nascimento:</strong> ${new Date(c.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR')}</p>

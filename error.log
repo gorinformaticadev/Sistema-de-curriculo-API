@@ -254,3 +254,5 @@
 [2025-11-26 16:39:13] [INFO] [IP: ::1] Login bem-sucedido para usuário atendimentogor@gmail.com (tipo: analisador)
 [2025-11-26 17:36:17] [INFO] [IP: ::1] Status do currículo ID 1 alterado para 'arquivado' pelo usuário atendimentogor@gmail.com
 [2025-11-26 17:36:30] [INFO] [IP: ::1] Status do currículo ID 1 alterado para 'classificado' pelo usuário atendimentogor@gmail.com
+[2025-11-26 18:21:34] [INFO] [IP: ::1] Status do currículo ID 1 alterado para 'pendente' pelo usuário atendimentogor@gmail.com
+[2025-11-26 18:21:45] [INFO] [IP: ::1] Status do currículo ID 1 alterado para 'classificado' pelo usuário atendimentogor@gmail.com
