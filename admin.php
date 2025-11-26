@@ -2089,7 +2089,21 @@ $totalCurriculos = $stmt->fetchColumn();
                             `<option value="${option.value}" ${c.status === option.value ? 'selected' : ''}>${option.label}</option>`
                         ).join('');
 
+                        // Verificar se há foto para exibir no cabeçalho
+                        let photoHeader = '';
+                        if (c.arquivo_foto) {
+                            photoHeader = `
+                                <div style="text-align: center; margin-bottom: 20px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
+                                    <img src="uploads/${encodeURIComponent(c.arquivo_foto)}" alt="Foto 3x4" style="width: 120px; height: 160px; object-fit: cover; border: 4px solid white; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+                                    <h2 style="margin: 15px 0 5px 0; font-size: 1.5rem;">${c.nome}</h2>
+                                    <p style="margin: 0; opacity: 0.9;">${c.email || 'Email não informado'}</p>
+                                </div>
+                            `;
+                        }
+
                         modalBody.innerHTML = `
+                            ${photoHeader}
+
                             <div style="margin-bottom: 20px; padding: 15px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #3b82f6;">
                                 <h4 style="margin: 0 0 10px 0; color: #1e40af;"><i class="fas fa-tag"></i> Status do Currículo</h4>
                                 <select id="curriculoStatus" onchange="changeStatusFromModal(${c.id}, this.value)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white; font-size: 14px;">
@@ -2098,44 +2112,69 @@ $totalCurriculos = $stmt->fetchColumn();
                                 <span id="statusUpdateMessage" style="margin-left: 10px; font-size: 14px;"></span>
                             </div>
 
-                            <h3><i class="fas fa-user"></i> Dados Pessoais</h3>
-                            <p><strong>Nome:</strong> ${c.nome}</p>
-                            <p><strong>Data de Nascimento:</strong> ${new Date(c.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
-                            <p><strong>Estado Civil:</strong> ${c.estado_civil}</p>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                <div>
+                                    <h3><i class="fas fa-user"></i> Dados Pessoais</h3>
+                                    <p><strong>Nome:</strong> ${c.nome}</p>
+                                    <p><strong>Data de Nascimento:</strong> ${new Date(c.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                                    <p><strong>Estado Civil:</strong> ${c.estado_civil || 'Não informado'}</p>
+                                    <p><strong>Status:</strong> ${c.status || 'Não definido'}</p>
+                                    <p><strong>Visualizado:</strong> ${c.visualizado ? 'Sim' : 'Não'}</p>
+                                    ${c.data_visualizacao ? `<p><strong>Data da Visualização:</strong> ${new Date(c.data_visualizacao).toLocaleString('pt-BR')}</p>` : ''}
+                                </div>
 
-                            <h3><i class="fas fa-phone"></i> Contato</h3>
-                            <p><strong>Telefone:</strong> ${c.telefone}</p>
-                            <p><strong>É WhatsApp?:</strong> ${c.is_whatsapp}</p>
-                            <p><strong>Email:</strong> ${c.email || 'Não informado'}</p>
-                            <p><strong>Facebook:</strong> ${c.facebook || 'Não informado'}</p>
-                            <p><strong>Instagram:</strong> ${c.instagram || 'Não informado'}</p>
-
-                            <h3><i class="fas fa-map-marker-alt"></i> Endereço</h3>
-                            <p><strong>Endereço:</strong> ${c.endereco}</p>
-                            <p><strong>Cidade:</strong> ${c.cidade}</p>
-                            <p><strong>Estado:</strong> ${c.estado}</p>
-
-                            <h3><i class="fas fa-graduation-cap"></i> Formação</h3>
-                            <p><strong>Escolaridade:</strong> ${c.escolaridade}</p>
-                            <p><strong>Está Estudando?:</strong> ${c.estudando}</p>
-                            ${c.periodo_estudo ? `<p><strong>Período de Estudo:</strong> ${c.periodo_estudo}</p>` : ''}
-                            <p><strong>Possui Cursos?:</strong> ${c.possui_cursos}</p>
-                            ${c.cursos ? `<p><strong>Cursos:</strong><br>${c.cursos.replace(/\n/g, '<br>')}</p>` : ''}
-
-                            <h3><i class="fas fa-briefcase"></i> Experiência Profissional</h3>
-                            ${experiencesHtml}
-
-                            <h3><i class="fas fa-target"></i> Objetivo</h3>
-                            <p>${c.motivacao.replace(/\n/g, '<br>')}</p>
-
-                            <h3><i class="fas fa-file-alt"></i> Arquivos</h3>
-                            <div class="modal-files">
-                                <a href="javascript:void(0);" onclick="showPdfModal('uploads/' + encodeURIComponent('${c.arquivo_curriculo}'))"><i class="fas fa-file-pdf"></i> Ver Currículo (PDF)</a>
-                                <a href="javascript:void(0);" onclick="showImageModal('uploads/' + encodeURIComponent('${c.arquivo_foto}'))"><i class="fas fa-camera"></i> Ver Foto</a>
+                                <div>
+                                    <h3><i class="fas fa-phone"></i> Contato</h3>
+                                    <p><strong>Telefone:</strong> ${c.telefone || 'Não informado'}</p>
+                                    <p><strong>É WhatsApp?:</strong> ${c.is_whatsapp ? 'Sim' : 'Não'}</p>
+                                    <p><strong>Email:</strong> ${c.email || 'Não informado'}</p>
+                                    ${c.facebook ? `<p><strong>Facebook:</strong> ${c.facebook}</p>` : ''}
+                                    ${c.instagram ? `<p><strong>Instagram:</strong> ${c.instagram}</p>` : ''}
+                                </div>
                             </div>
 
-                            <hr style="margin-top: 20px;">
-                            <p><small>IP do Cadastro: ${c.ip_cadastro} | Data: ${new Date(c.data_cadastro).toLocaleString('pt-BR')}</small></p>
+                            <h3><i class="fas fa-map-marker-alt"></i> Endereço</h3>
+                            <p><strong>Endereço:</strong> ${c.endereco || 'Não informado'}</p>
+                            <p><strong>Cidade:</strong> ${c.cidade || 'Não informado'}</p>
+                            <p><strong>Estado:</strong> ${c.estado || 'Não informado'}</p>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                <div>
+                                    <h3><i class="fas fa-graduation-cap"></i> Formação</h3>
+                                    <p><strong>Escolaridade:</strong> ${c.escolaridade || 'Não informado'}</p>
+                                    <p><strong>Está Estudando?:</strong> ${c.estudando ? 'Sim' : 'Não'}</p>
+                                    ${c.periodo_estudo ? `<p><strong>Período de Estudo:</strong> ${c.periodo_estudo}</p>` : ''}
+                                    <p><strong>Possui Cursos?:</strong> ${c.possui_cursos ? 'Sim' : 'Não'}</p>
+                                    ${c.cursos ? `<p><strong>Cursos:</strong><br><div style="background: #f8fafc; padding: 10px; border-radius: 6px; margin-top: 5px;">${c.cursos.replace(/\n/g, '<br>')}</div></p>` : ''}
+                                </div>
+
+                                <div>
+                                    <h3><i class="fas fa-briefcase"></i> Experiência Profissional</h3>
+                                    <p><strong>Possui Experiência?:</strong> ${c.possui_experiencia ? 'Sim' : 'Não'}</p>
+                                    ${experiencesHtml}
+                                </div>
+                            </div>
+
+                            <h3><i class="fas fa-target"></i> Objetivo</h3>
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                                ${c.motivacao ? c.motivacao.replace(/\n/g, '<br>') : 'Não informado'}
+                            </div>
+
+                            <h3><i class="fas fa-file-alt"></i> Arquivos Anexados</h3>
+                            <div class="modal-files" style="display: flex; gap: 20px; flex-wrap: wrap;">
+                                ${c.arquivo_curriculo ? `<a href="javascript:void(0);" onclick="showPdfModal('uploads/' + encodeURIComponent('${c.arquivo_curriculo}'))" style="display: inline-flex; align-items: center; gap: 8px; background: #dc2626; color: white; padding: 10px 15px; border-radius: 6px; text-decoration: none;"><i class="fas fa-file-pdf"></i> Ver Currículo (PDF)</a>` : '<span style="color: #6b7280;">Nenhum currículo anexado</span>'}
+                                ${c.arquivo_foto ? `<a href="javascript:void(0);" onclick="showImageModal('uploads/' + encodeURIComponent('${c.arquivo_foto}'))" style="display: inline-flex; align-items: center; gap: 8px; background: #059669; color: white; padding: 10px 15px; border-radius: 6px; text-decoration: none;"><i class="fas fa-camera"></i> Ver Foto</a>` : '<span style="color: #6b7280;">Nenhuma foto anexada</span>'}
+                            </div>
+
+                            <hr style="margin-top: 30px;">
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; font-size: 0.9rem; color: #6b7280;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                    <div><strong>IP do Cadastro:</strong> ${c.ip_cadastro || 'Não registrado'}</div>
+                                    <div><strong>Data do Cadastro:</strong> ${new Date(c.data_cadastro).toLocaleString('pt-BR')}</div>
+                                    ${c.data_visualizacao ? `<div><strong>Primeira Visualização:</strong> ${new Date(c.data_visualizacao).toLocaleString('pt-BR')}</div>` : ''}
+                                    <div><strong>ID do Registro:</strong> #${c.id}</div>
+                                </div>
+                            </div>
                         `;
                     } else {
                         modalBody.innerHTML = `<p class="error-message">${data.message}</p>`;
