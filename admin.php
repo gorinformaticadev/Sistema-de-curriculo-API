@@ -786,7 +786,7 @@ if (isAdmin()) {
     // API para buscar detalhes de uma sessão específica
     if (isset($_GET['action']) && $_GET['action'] === 'getSessionDetails') {
         header('Content-Type: application/json');
-        
+
         $sessionId = $_GET['session_id'] ?? '';
 
         if (!$sessionId) {
@@ -796,7 +796,7 @@ if (isAdmin()) {
 
         try {
             $stmt = $pdo->prepare("
-                SELECT 
+                SELECT
                     ultimo_campo,
                     acao,
                     valor_campo,
@@ -806,7 +806,7 @@ if (isAdmin()) {
                 AND acao != 'form_submitted'
                 ORDER BY timestamp ASC
             ");
-            
+
             $stmt->execute([$sessionId]);
             $interactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -814,6 +814,157 @@ if (isAdmin()) {
                 'success' => true,
                 'interactions' => $interactions
             ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // API para enviar mensagem WhatsApp
+    if (isset($_POST['action']) && $_POST['action'] === 'sendWhatsAppMessage' && canAccessAction('sendWhatsAppMessage')) {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        $curriculoId = filter_input(INPUT_POST, 'curriculo_id', FILTER_VALIDATE_INT);
+        $mensagem = trim($_POST['mensagem'] ?? '');
+
+        if (!$curriculoId) {
+            echo json_encode(['success' => false, 'message' => 'ID do currículo inválido.']);
+            exit;
+        }
+
+        if (empty($mensagem)) {
+            echo json_encode(['success' => false, 'message' => 'Mensagem não pode estar vazia.']);
+            exit;
+        }
+
+        try {
+            // Buscar dados do currículo
+            $stmt = $pdo->prepare("SELECT nome, telefone, is_whatsapp FROM curriculos WHERE id = ?");
+            $stmt->execute([$curriculoId]);
+            $curriculo = $stmt->fetch();
+
+            if (!$curriculo) {
+                echo json_encode(['success' => false, 'message' => 'Currículo não encontrado.']);
+                exit;
+            }
+
+            if (!$curriculo['is_whatsapp']) {
+                echo json_encode(['success' => false, 'message' => 'Este contato não possui WhatsApp cadastrado.']);
+                exit;
+            }
+
+            // Preparar número (remover caracteres não numéricos e adicionar código do país se necessário)
+            $numeroLimpo = preg_replace('/\D/', '', $curriculo['telefone']);
+            if (strlen($numeroLimpo) == 11 && substr($numeroLimpo, 0, 1) == '0') {
+                // Remove o 0 inicial se for número brasileiro
+                $numeroLimpo = substr($numeroLimpo, 1);
+            }
+            if (strlen($numeroLimpo) == 10 || strlen($numeroLimpo) == 11) {
+                // Adicionar código do Brasil se não tiver
+                $numeroLimpo = '55' . $numeroLimpo;
+            }
+
+            // Enviar mensagem via API
+            $token = $config['api_token'];
+            $url = $config['api_url'];
+
+            if (empty($token) || empty($url)) {
+                echo json_encode(['success' => false, 'message' => 'Configuração da API WhatsApp não encontrada.']);
+                exit;
+            }
+
+            $data = [
+                'number' => $numeroLimpo,
+                'body' => $mensagem,
+                'saveOnTicket' => true
+            ];
+
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($data),
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $token
+                ]
+            ]);
+
+            $response = curl_exec($ch);
+            $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            $statusEnvio = ($httpcode === 200) ? 'enviado' : 'erro';
+
+            // Salvar no histórico
+            $stmt = $pdo->prepare("
+                INSERT INTO whatsapp_messages
+                (curriculo_id, numero_destino, mensagem, status_envio, resposta_api, enviado_por)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $curriculoId,
+                $numeroLimpo,
+                $mensagem,
+                $statusEnvio,
+                $response,
+                $_SESSION['user_email'] ?? 'Sistema'
+            ]);
+
+            logError("WhatsApp enviado para {$curriculo['nome']} ({$numeroLimpo}): " . ($statusEnvio === 'enviado' ? 'Sucesso' : 'Erro'), 'INFO');
+
+            echo json_encode([
+                'success' => $statusEnvio === 'enviado',
+                'message' => $statusEnvio === 'enviado' ? 'Mensagem enviada com sucesso!' : 'Erro ao enviar mensagem.',
+                'response' => $response,
+                'numero' => $numeroLimpo
+            ]);
+
+        } catch (Exception $e) {
+            logError('Erro ao enviar WhatsApp: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erro interno do servidor.']);
+        }
+        exit;
+    }
+
+    // API para buscar histórico de mensagens WhatsApp
+    if (isset($_GET['action']) && $_GET['action'] === 'getWhatsAppHistory' && canAccessAction('getWhatsAppHistory')) {
+        header('Content-Type: application/json');
+
+        $curriculoId = filter_input(INPUT_GET, 'curriculo_id', FILTER_VALIDATE_INT);
+
+        if (!$curriculoId) {
+            echo json_encode(['success' => false, 'message' => 'ID do currículo inválido.']);
+            exit;
+        }
+
+        try {
+            $stmt = $pdo->prepare("
+                SELECT
+                    id,
+                    mensagem,
+                    status_envio,
+                    resposta_api,
+                    enviado_por,
+                    data_envio
+                FROM whatsapp_messages
+                WHERE curriculo_id = ?
+                ORDER BY data_envio DESC
+                LIMIT 20
+            ");
+            $stmt->execute([$curriculoId]);
+            $mensagens = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            echo json_encode([
+                'success' => true,
+                'mensagens' => $mensagens
+            ]);
+
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
@@ -1631,6 +1782,17 @@ $totalCurriculos = $stmt->fetchColumn();
         </div>
     </div>
 
+    <!-- Modal para Envio Rápido de WhatsApp -->
+    <div id="whatsappModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="modal-close" onclick="document.getElementById('whatsappModal').style.display='none'">&times;</span>
+            <h2><i class="fab fa-whatsapp" style="color: #25d366;"></i> Enviar WhatsApp</h2>
+            <div id="whatsappModalContent">
+                <!-- Conteúdo será carregado dinamicamente -->
+            </div>
+        </div>
+    </div>
+
 
     <script>
         // Tipo de usuário atual
@@ -1725,6 +1887,7 @@ $totalCurriculos = $stmt->fetchColumn();
                                             <option value="classificado" ${c.status === 'classificado' ? 'selected' : ''}>Classificado</option>
                                             <option value="arquivado" ${c.status === 'arquivado' ? 'selected' : ''}>Arquivado</option>
                                         </select>
+                                        ${c.status === 'classificado' && c.is_whatsapp ? `<button class="btn-small" onclick="openWhatsAppModal(${c.id}, '${c.nome}', '${c.telefone}')" style="margin-left: 5px; background: #25d366; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;" title="Enviar WhatsApp"><i class="fab fa-whatsapp"></i></button>` : ''}
                                         ${userType === 'admin' ? `<button class="btn-remove btn-small" onclick="deleteCurriculo(${c.id}, this)" style="margin-left: 5px;"><i class="fas fa-trash"></i> Deletar</button>` : ''}
                                     </td>
                                 </tr>
@@ -2052,6 +2215,9 @@ $totalCurriculos = $stmt->fetchColumn();
                 pdfModal.style.display = "none";
                 pdfViewer.src = ""; // Limpa o src
             }
+            if (event.target == document.getElementById('whatsappModal')) {
+                document.getElementById('whatsappModal').style.display = "none";
+            }
         }
 
         function showImageModal(src) { imageModal.style.display = "block"; modalImage.src = src; }
@@ -2111,6 +2277,38 @@ $totalCurriculos = $stmt->fetchColumn();
                                 </select>
                                 <span id="statusUpdateMessage" style="margin-left: 10px; font-size: 14px;"></span>
                             </div>
+
+                            ${c.status === 'classificado' && c.is_whatsapp ? `
+                            <div style="margin-bottom: 20px; padding: 15px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #0ea5e9;">
+                                <h4 style="margin: 0 0 15px 0; color: #0c4a6e;"><i class="fab fa-whatsapp"></i> Enviar Mensagem WhatsApp</h4>
+
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #374151;">Mensagem:</label>
+                                    <textarea id="whatsappMessage" rows="4" placeholder="Digite a mensagem para enviar via WhatsApp..." style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; resize: vertical;">Olá ${c.nome}!
+
+Seu currículo foi classificado e estamos interessados em seu perfil.
+Gostaríamos de agendar uma conversa para discutir oportunidades.
+
+Atenciosamente,
+Equipe de RH</textarea>
+                                </div>
+
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <button onclick="sendWhatsAppMessage(${c.id})" style="background: #25d366; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                        <i class="fab fa-whatsapp"></i> Enviar WhatsApp
+                                    </button>
+                                    <button onclick="loadWhatsAppHistory(${c.id})" style="background: #6b7280; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                                        <i class="fas fa-history"></i> Ver Histórico
+                                    </button>
+                                    <span id="whatsappSendMessage" style="font-size: 14px;"></span>
+                                </div>
+
+                                <div id="whatsappHistory" style="margin-top: 15px; display: none;">
+                                    <h5 style="margin: 0 0 10px 0; color: #374151;"><i class="fas fa-list"></i> Histórico de Mensagens</h5>
+                                    <div id="whatsappHistoryContent" style="max-height: 200px; overflow-y: auto; background: white; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px;"></div>
+                                </div>
+                            </div>
+                            ` : ''}
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                                 <div>
@@ -2589,6 +2787,208 @@ $totalCurriculos = $stmt->fetchColumn();
                     }
                 })
                 .catch(err => alert('Erro de comunicação com o servidor.'));
+        }
+
+        // Função para abrir modal de WhatsApp
+        function openWhatsAppModal(curriculoId, nome, telefone) {
+            const modal = document.getElementById('whatsappModal');
+            const content = document.getElementById('whatsappModalContent');
+
+            content.innerHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <i class="fab fa-whatsapp" style="font-size: 3rem; color: #25d366; margin-bottom: 10px;"></i>
+                    <h3 style="margin: 0; color: #1f2937;">Enviar WhatsApp para ${nome}</h3>
+                    <p style="margin: 5px 0 0 0; color: #6b7280;">${telefone}</p>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">Mensagem:</label>
+                    <textarea id="quickWhatsAppMessage" rows="4" placeholder="Digite sua mensagem..." style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-family: inherit; resize: vertical;">Olá ${nome}!
+
+Gostaríamos de conversar sobre seu currículo.
+Podemos agendar uma conversa?
+
+Atenciosamente,
+Equipe de RH</textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="document.getElementById('whatsappModal').style.display='none'" style="background: #6b7280; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                        Cancelar
+                    </button>
+                    <button onclick="sendQuickWhatsAppMessage(${curriculoId})" style="background: #25d366; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                        <i class="fab fa-whatsapp"></i> Enviar
+                    </button>
+                </div>
+
+                <div id="quickWhatsAppMessageStatus" style="margin-top: 15px; text-align: center;"></div>
+            `;
+
+            modal.style.display = 'block';
+        }
+
+        // Função para enviar mensagem rápida via WhatsApp
+        function sendQuickWhatsAppMessage(curriculoId) {
+            const messageTextarea = document.getElementById('quickWhatsAppMessage');
+            const statusDiv = document.getElementById('quickWhatsAppMessageStatus');
+            const mensagem = messageTextarea.value.trim();
+
+            if (!mensagem) {
+                statusDiv.textContent = 'Digite uma mensagem antes de enviar.';
+                statusDiv.style.color = '#ef4444';
+                return;
+            }
+
+            // Desabilitar textarea e botão durante o envio
+            messageTextarea.disabled = true;
+            const sendButton = event.target;
+            sendButton.disabled = true;
+            sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+
+            statusDiv.textContent = 'Enviando mensagem...';
+            statusDiv.style.color = '#6b7280';
+
+            const formData = new FormData();
+            formData.append('action', 'sendWhatsAppMessage');
+            formData.append('curriculo_id', curriculoId);
+            formData.append('mensagem', mensagem);
+
+            // Pegar token CSRF
+            const csrfToken = document.querySelector('input[name="csrf_token"]');
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken.value);
+            }
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        statusDiv.textContent = 'Mensagem enviada com sucesso!';
+                        statusDiv.style.color = '#10b981';
+                        setTimeout(() => {
+                            document.getElementById('whatsappModal').style.display = 'none';
+                        }, 2000);
+                    } else {
+                        statusDiv.textContent = data.message || 'Erro ao enviar mensagem.';
+                        statusDiv.style.color = '#ef4444';
+                        // Reabilitar controles em caso de erro
+                        messageTextarea.disabled = false;
+                        sendButton.disabled = false;
+                        sendButton.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar';
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao enviar WhatsApp:', err);
+                    statusDiv.textContent = 'Erro de conexão.';
+                    statusDiv.style.color = '#ef4444';
+                    messageTextarea.disabled = false;
+                    sendButton.disabled = false;
+                    sendButton.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar';
+                });
+        }
+
+        // Função para enviar mensagem WhatsApp
+        function sendWhatsAppMessage(curriculoId) {
+            const messageTextarea = document.getElementById('whatsappMessage');
+            const sendMessage = document.getElementById('whatsappSendMessage');
+            const mensagem = messageTextarea.value.trim();
+
+            if (!mensagem) {
+                sendMessage.textContent = 'Digite uma mensagem antes de enviar.';
+                sendMessage.style.color = '#ef4444';
+                return;
+            }
+
+            // Desabilitar textarea e botão durante o envio
+            messageTextarea.disabled = true;
+            const sendButton = event.target;
+            sendButton.disabled = true;
+            sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+
+            sendMessage.textContent = 'Enviando mensagem...';
+            sendMessage.style.color = '#6b7280';
+
+            const formData = new FormData();
+            formData.append('action', 'sendWhatsAppMessage');
+            formData.append('curriculo_id', curriculoId);
+            formData.append('mensagem', mensagem);
+
+            // Pegar token CSRF
+            const csrfToken = document.querySelector('input[name="csrf_token"]');
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken.value);
+            }
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        sendMessage.textContent = 'Mensagem enviada com sucesso!';
+                        sendMessage.style.color = '#10b981';
+                        messageTextarea.value = ''; // Limpar textarea
+                        loadWhatsAppHistory(curriculoId); // Recarregar histórico
+                    } else {
+                        sendMessage.textContent = data.message || 'Erro ao enviar mensagem.';
+                        sendMessage.style.color = '#ef4444';
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao enviar WhatsApp:', err);
+                    sendMessage.textContent = 'Erro de conexão.';
+                    sendMessage.style.color = '#ef4444';
+                })
+                .finally(() => {
+                    // Reabilitar controles
+                    messageTextarea.disabled = false;
+                    sendButton.disabled = false;
+                    sendButton.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar WhatsApp';
+                });
+        }
+
+        // Função para carregar histórico de mensagens WhatsApp
+        function loadWhatsAppHistory(curriculoId) {
+            const historyDiv = document.getElementById('whatsappHistory');
+            const historyContent = document.getElementById('whatsappHistoryContent');
+
+            historyContent.innerHTML = '<p style="text-align: center; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Carregando...</p>';
+            historyDiv.style.display = 'block';
+
+            fetch(`admin.php?action=getWhatsAppHistory&curriculo_id=${curriculoId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.mensagens.length > 0) {
+                        let html = '';
+                        data.mensagens.forEach(msg => {
+                            const statusIcon = msg.status_envio === 'enviado' ? 'fa-check-circle' : 'fa-times-circle';
+                            const statusColor = msg.status_envio === 'enviado' ? '#10b981' : '#ef4444';
+                            const dataFormatada = new Date(msg.data_envio).toLocaleString('pt-BR');
+
+                            html += `
+                                <div style="margin-bottom: 15px; padding: 12px; background: #f8fafc; border-radius: 8px; border-left: 3px solid ${statusColor};">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <span style="font-weight: 600; color: ${statusColor};">
+                                            <i class="fas ${statusIcon}"></i> ${msg.status_envio === 'enviado' ? 'Enviada' : 'Erro'}
+                                        </span>
+                                        <small style="color: #6b7280;">${dataFormatada}</small>
+                                    </div>
+                                    <div style="margin-bottom: 5px;">
+                                        <strong>Por:</strong> ${msg.enviado_por}
+                                    </div>
+                                    <div style="background: white; padding: 8px; border-radius: 4px; border: 1px solid #e5e7eb; font-family: 'Segoe UI', sans-serif;">
+                                        ${msg.mensagem.replace(/\n/g, '<br>')}
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        historyContent.innerHTML = html;
+                    } else {
+                        historyContent.innerHTML = '<p style="text-align: center; color: #6b7280;">Nenhuma mensagem enviada ainda.</p>';
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar histórico:', err);
+                    historyContent.innerHTML = '<p style="color: #ef4444;">Erro ao carregar histórico.</p>';
+                });
         }
 
         // Carregamento inicial

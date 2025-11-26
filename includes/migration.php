@@ -231,6 +231,30 @@ class DatabaseMigration {
                         return "Sistema de status já estava implementado";
                     }
                 }
+            ],
+            '2.2.0' => [
+                'description' => 'Sistema de mensagens WhatsApp',
+                'script' => function($pdo) {
+                    // Criar tabela para histórico de mensagens WhatsApp
+                    $pdo->exec("
+                        CREATE TABLE IF NOT EXISTS whatsapp_messages (
+                            `id` INT AUTO_INCREMENT PRIMARY KEY,
+                            `curriculo_id` INT NOT NULL,
+                            `numero_destino` VARCHAR(20) NOT NULL,
+                            `mensagem` TEXT NOT NULL,
+                            `status_envio` ENUM('enviado', 'erro', 'pendente') DEFAULT 'pendente',
+                            `resposta_api` TEXT,
+                            `enviado_por` VARCHAR(255),
+                            `data_envio` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (`curriculo_id`) REFERENCES `curriculos`(`id`) ON DELETE CASCADE,
+                            INDEX `idx_curriculo_id` (`curriculo_id`),
+                            INDEX `idx_data_envio` (`data_envio`),
+                            INDEX `idx_status_envio` (`status_envio`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                    ");
+
+                    return "Sistema de mensagens WhatsApp implementado com sucesso";
+                }
             ]
         ];
     }
@@ -280,7 +304,9 @@ class DatabaseMigration {
                 }
             }
             
-            $this->pdo->commit();
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->commit();
+            }
             
         } catch (Exception $e) {
             if ($this->pdo->inTransaction()) {
