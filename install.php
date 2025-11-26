@@ -6,6 +6,278 @@
 
 require_once 'includes/migration.php';
 
+/**
+ * Classe para Backup do Sistema
+ */
+class SystemBackup {
+    private $backupDir;
+    private $pdo;
+
+    public function __construct($pdo) {
+        $this->pdo = $pdo;
+        $this->backupDir = __DIR__ . '/backups';
+
+        // Criar diretório de backup se não existir
+        if (!is_dir($this->backupDir)) {
+            mkdir($this->backupDir, 0755, true);
+        }
+    }
+
+    /**
+     * Cria backup completo do sistema
+     */
+    public function createFullBackup($dbName, $dbUser, $dbPass) {
+        $timestamp = date('Y-m-d_H-i-s');
+        $backupPath = $this->backupDir . '/backup_' . $timestamp;
+
+        if (!is_dir($backupPath)) {
+            mkdir($backupPath, 0755, true);
+        }
+
+        $results = [];
+
+        // Backup do banco de dados
+        $dbBackupResult = $this->backupDatabase($dbName, $dbUser, $dbPass, $backupPath);
+        $results['database'] = $dbBackupResult;
+
+        // Backup da pasta uploads
+        $uploadsBackupResult = $this->backupUploadsFolder($backupPath);
+        $results['uploads'] = $uploadsBackupResult;
+
+        // Criar arquivo de manifesto
+        $manifest = [
+            'timestamp' => $timestamp,
+            'date' => date('Y-m-d H:i:s'),
+            'database' => $dbBackupResult,
+            'uploads' => $uploadsBackupResult,
+            'version' => '2.0'
+        ];
+
+        file_put_contents($backupPath . '/manifest.json', json_encode($manifest, JSON_PRETTY_PRINT));
+
+        return [
+            'success' => $dbBackupResult['success'] && $uploadsBackupResult['success'],
+            'path' => $backupPath,
+            'timestamp' => $timestamp,
+            'results' => $results
+        ];
+    }
+
+    /**
+     * Backup do banco de dados MySQL
+     */
+    private function backupDatabase($dbName, $dbUser, $dbPass, $backupPath) {
+        try {
+            $backupFile = $backupPath . '/database_backup.sql';
+
+            // Usar mysqldump se disponível
+            $command = "mysqldump --user=" . escapeshellarg($dbUser) .
+                      " --password=" . escapeshellarg($dbPass) .
+                      " --host=localhost " . escapeshellarg($dbName) .
+                      " --single-transaction --routines --triggers > " . escapeshellarg($backupFile) . " 2>&1";
+
+            exec($command, $output, $returnCode);
+
+            if ($returnCode === 0) {
+                $fileSize = filesize($backupFile);
+                return [
+                    'success' => true,
+                    'file' => $backupFile,
+                    'size' => $this->formatBytes($fileSize),
+                    'message' => 'Backup do banco criado com sucesso'
+                ];
+            } else {
+                // Fallback: export manual das tabelas
+                return $this->manualDatabaseBackup($dbName, $backupFile);
+            }
+
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'message' => 'Erro ao criar backup do banco'
+            ];
+        }
+    }
+
+    /**
+     * Backup manual do banco (fallback)
+     */
+    private function manualDatabaseBackup($dbName, $backupFile) {
+        try {
+            $sql = "-- Backup Manual do Banco de Dados: $dbName\n";
+            $sql .= "-- Criado em: " . date('Y-m-d H:i:s') . "\n\n";
+
+            // Obter lista de tabelas
+            $stmt = $this->pdo->query("SHOW TABLES");
+            $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+            foreach ($tables as $table) {
+                // Estrutura da tabela
+                $stmt = $this->pdo->query("SHOW CREATE TABLE `$table`");
+                $createTable = $stmt->fetch(PDO::FETCH_ASSOC);
+                $sql .= "-- Estrutura da tabela `$table`\n";
+                $sql .= $createTable['Create Table'] . ";\n\n";
+
+                // Dados da tabela
+                $stmt = $this->pdo->query("SELECT * FROM `$table`");
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                if (!empty($rows)) {
+                    $sql .= "-- Dados da tabela `$table`\n";
+                    foreach ($rows as $row) {
+                        $values = array_map(function($value) {
+                            return $value === null ? 'NULL' : $this->pdo->quote($value);
+                        }, $row);
+                        $sql .= "INSERT INTO `$table` VALUES (" . implode(', ', $values) . ");\n";
+                    }
+                    $sql .= "\n";
+                }
+            }
+
+            file_put_contents($backupFile, $sql);
+
+            return [
+                'success' => true,
+                'file' => $backupFile,
+                'size' => $this->formatBytes(strlen($sql)),
+                'message' => 'Backup manual do banco criado com sucesso',
+                'method' => 'manual'
+            ];
+
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'message' => 'Erro no backup manual do banco'
+            ];
+        }
+    }
+
+    /**
+     * Backup da pasta uploads
+     */
+    private function backupUploadsFolder($backupPath) {
+        try {
+            $uploadsDir = __DIR__ . '/uploads';
+            $backupUploadsDir = $backupPath . '/uploads';
+
+            if (!is_dir($uploadsDir)) {
+                return [
+                    'success' => true,
+                    'message' => 'Pasta uploads não existe, backup ignorado',
+                    'files' => 0,
+                    'size' => '0 B'
+                ];
+            }
+
+            // Copiar pasta uploads recursivamente
+            $this->copyDirectory($uploadsDir, $backupUploadsDir);
+
+            // Calcular estatísticas
+            $stats = $this->getDirectoryStats($backupUploadsDir);
+
+            return [
+                'success' => true,
+                'source' => $uploadsDir,
+                'destination' => $backupUploadsDir,
+                'files' => $stats['files'],
+                'size' => $this->formatBytes($stats['size']),
+                'message' => 'Backup da pasta uploads criado com sucesso'
+            ];
+
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'message' => 'Erro ao criar backup da pasta uploads'
+            ];
+        }
+    }
+
+    /**
+     * Copia diretório recursivamente
+     */
+    private function copyDirectory($source, $destination) {
+        if (!is_dir($destination)) {
+            mkdir($destination, 0755, true);
+        }
+
+        $dir = opendir($source);
+        while (($file = readdir($dir)) !== false) {
+            if ($file != '.' && $file != '..') {
+                $sourcePath = $source . '/' . $file;
+                $destPath = $destination . '/' . $file;
+
+                if (is_dir($sourcePath)) {
+                    $this->copyDirectory($sourcePath, $destPath);
+                } else {
+                    copy($sourcePath, $destPath);
+                }
+            }
+        }
+        closedir($dir);
+    }
+
+    /**
+     * Obtém estatísticas do diretório
+     */
+    private function getDirectoryStats($dir) {
+        $files = 0;
+        $size = 0;
+
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
+        foreach ($iterator as $file) {
+            if ($file->isFile()) {
+                $files++;
+                $size += $file->getSize();
+            }
+        }
+
+        return ['files' => $files, 'size' => $size];
+    }
+
+    /**
+     * Formata bytes para leitura humana
+     */
+    private function formatBytes($bytes) {
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $i = 0;
+        while ($bytes >= 1024 && $i < count($units) - 1) {
+            $bytes /= 1024;
+            $i++;
+        }
+        return round($bytes, 2) . ' ' . $units[$i];
+    }
+
+    /**
+     * Lista backups disponíveis
+     */
+    public function listBackups() {
+        $backups = [];
+
+        if (is_dir($this->backupDir)) {
+            $dirs = scandir($this->backupDir);
+            foreach ($dirs as $dir) {
+                if ($dir != '.' && $dir != '..' && is_dir($this->backupDir . '/' . $dir)) {
+                    $manifestFile = $this->backupDir . '/' . $dir . '/manifest.json';
+                    if (file_exists($manifestFile)) {
+                        $manifest = json_decode(file_get_contents($manifestFile), true);
+                        $backups[] = $manifest;
+                    }
+                }
+            }
+        }
+
+        // Ordenar por timestamp (mais recente primeiro)
+        usort($backups, function($a, $b) {
+            return strtotime($b['timestamp']) - strtotime($a['timestamp']);
+        });
+
+        return $backups;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $installMode = $_POST['install_mode'] ?? 'install';
     $dbName = trim($_POST['db_name'] ?? '');
@@ -65,18 +337,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Executar migrações se estiver em modo update
             if ($installMode === 'update') {
+                // CRIAR BACKUP ANTES DE QUALQUER ALTERAÇÃO
+                $steps[] = "🔒 Criando backup de segurança...";
+                try {
+                    $backup = new SystemBackup($pdo);
+                    $backupResult = $backup->createFullBackup($dbName, $dbUser, $dbPass);
+
+                    if ($backupResult['success']) {
+                        $steps[] = "✅ Backup criado em: backups/backup_{$backupResult['timestamp']}";
+                        $steps[] = "  💾 Banco: {$backupResult['results']['database']['size']}";
+                        $steps[] = "  📁 Uploads: {$backupResult['results']['uploads']['size']} ({$backupResult['results']['uploads']['files']} arquivos)";
+                    } else {
+                        $warnings[] = "⚠️ Aviso: Não foi possível criar backup automático. Continue com cuidado.";
+                        $steps[] = "⚠️ Backup não criado - verifique permissões e espaço em disco";
+                    }
+                } catch (Exception $e) {
+                    $warnings[] = "⚠️ Erro ao criar backup: " . $e->getMessage();
+                    $steps[] = "⚠️ Backup falhou - prosseguindo com atualização";
+                }
+
                 $migration = new DatabaseMigration($pdo);
                 $currentVersion = $migration->getCurrentVersion();
-                
+
                 $steps[] = "📊 Versão atual do banco: $currentVersion";
                 $steps[] = "🔄 Iniciando processo de migração...";
-                
+
                 try {
                     $migrationResult = $migration->migrate();
-                    
+
                     if ($migrationResult['success']) {
                         $steps[] = "✅ Migrações concluídas com sucesso!";
-                        
+
                         if (!empty($migrationResult['applied_migrations'])) {
                             foreach ($migrationResult['applied_migrations'] as $migration) {
                                 $steps[] = "  📦 Versão {$migration['version']}: {$migration['description']}";
@@ -87,12 +378,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } else {
                         throw new Exception("Erro durante as migrações: " . implode(", ", $migrationResult['errors']));
                     }
-                    
+
                 } catch (Exception $e) {
                     $steps[] = "❌ Erro durante migração: " . $e->getMessage();
                     throw $e;
                 }
-                
+
             } else {
                 // Modo instalação - criar estrutura inicial
                 $migration = new DatabaseMigration($pdo);
