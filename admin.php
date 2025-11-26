@@ -1585,74 +1585,85 @@ $totalCurriculos = $stmt->fetchColumn();
                 });
         }
         
-        // Salvar Config API
-        document.getElementById('apiConfigForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            formData.append('action', 'saveApiConfig');
+        // Salvar Config API (apenas para admin)
+        const apiConfigForm = document.getElementById('apiConfigForm');
+        if (apiConfigForm) {
+            apiConfigForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                formData.append('action', 'saveApiConfig');
 
-            // Adicionar o token CSRF ao FormData para o fetch
-            const csrfToken = document.querySelector('#apiConfigForm input[name="csrf_token"]').value;
-            if (csrfToken) {
-                formData.append('csrf_token', csrfToken);
-            }
-            
-            fetch('admin.php', { method: 'POST', body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    const msgDiv = document.getElementById('configApiSuccess');
-                    msgDiv.textContent = data.message;
-                    msgDiv.style.display = 'block';
-                    setTimeout(() => msgDiv.style.display = 'none', 3000);
-                });
-        });
+                // Adicionar o token CSRF ao FormData para o fetch
+                const csrfToken = document.querySelector('#apiConfigForm input[name="csrf_token"]').value;
+                if (csrfToken) {
+                    formData.append('csrf_token', csrfToken);
+                }
 
-        // Salvar Config Email
-        document.getElementById('emailConfigForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            formData.append('action', 'saveEmailConfig');
+                fetch('admin.php', { method: 'POST', body: formData })
+                    .then(res => res.json())
+                    .then(data => {
+                        const msgDiv = document.getElementById('configApiSuccess');
+                        msgDiv.textContent = data.message;
+                        msgDiv.style.display = 'block';
+                        setTimeout(() => msgDiv.style.display = 'none', 3000);
+                    });
+            });
+        }
 
-            // Adicionar o token CSRF ao FormData para o fetch
-            const csrfToken = document.querySelector('#emailConfigForm input[name="csrf_token"]').value;
-            if (csrfToken) {
-                formData.append('csrf_token', csrfToken);
-            }
+        // Salvar Config Email (apenas para admin)
+        const emailConfigForm = document.getElementById('emailConfigForm');
+        if (emailConfigForm) {
+            emailConfigForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                formData.append('action', 'saveEmailConfig');
 
-            fetch('admin.php', { method: 'POST', body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    const msgDiv = document.getElementById('configEmailSuccess');
-                    msgDiv.textContent = data.message;
-                    msgDiv.style.display = 'block';
-                    setTimeout(() => msgDiv.style.display = 'none', 3000);
-                });
-        });
+                // Adicionar o token CSRF ao FormData para o fetch
+                const csrfToken = document.querySelector('#emailConfigForm input[name="csrf_token"]').value;
+                if (csrfToken) {
+                    formData.append('csrf_token', csrfToken);
+                }
 
-        // Salvar Credenciais
-        document.getElementById('credentialsForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            formData.append('action', 'updateCredentials');
+                fetch('admin.php', { method: 'POST', body: formData })
+                    .then(res => res.json())
+                    .then(data => {
+                        const msgDiv = document.getElementById('configEmailSuccess');
+                        msgDiv.textContent = data.message;
+                        msgDiv.style.display = 'block';
+                        setTimeout(() => msgDiv.style.display = 'none', 3000);
+                    });
+            });
+        }
 
-            // Adicionar o token CSRF ao FormData para o fetch
-            const csrfToken = document.querySelector('#credentialsForm input[name="csrf_token"]').value;
-            if (csrfToken) {
-                formData.append('csrf_token', csrfToken);
-            }
+        // Salvar Credenciais (apenas para admin)
+        const credentialsForm = document.getElementById('credentialsForm');
+        if (credentialsForm) {
+            credentialsForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                formData.append('action', 'updateCredentials');
 
-            fetch('admin.php', { method: 'POST', body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    const msgDiv = document.getElementById('configCredentialsSuccess');
-                    msgDiv.textContent = data.message;
-                    msgDiv.style.display = 'block';
-                    setTimeout(() => msgDiv.style.display = 'none', 3000);
-                });
-        });
+                // Adicionar o token CSRF ao FormData para o fetch
+                const csrfToken = document.querySelector('#credentialsForm input[name="csrf_token"]').value;
+                if (csrfToken) {
+                    formData.append('csrf_token', csrfToken);
+                }
+
+                fetch('admin.php', { method: 'POST', body: formData })
+                    .then(res => res.json())
+                    .then(data => {
+                        const msgDiv = document.getElementById('configCredentialsSuccess');
+                        msgDiv.textContent = data.message;
+                        msgDiv.style.display = 'block';
+                        setTimeout(() => msgDiv.style.display = 'none', 3000);
+                    });
+            });
+        }
 
         function loadLogs() {
             const container = document.getElementById('logsContainer');
+            if (!container) return; // Só existe para admin
+
             container.innerHTML = 'Carregando...';
             fetch('admin.php?action=getLogs')
                 .then(res => res.json())
@@ -1698,6 +1709,8 @@ $totalCurriculos = $stmt->fetchColumn();
 
         function loadAccessLogs() {
             const container = document.getElementById('accessLogsContainer');
+            if (!container) return; // Só existe para admin
+
             container.innerHTML = 'Carregando...';
             fetch('admin.php?action=getAccessLogs')
                 .then(res => res.json())
@@ -1738,31 +1751,34 @@ $totalCurriculos = $stmt->fetchColumn();
                 });
         }
 
-        // Teste da API
-        document.getElementById('apiTestForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const resultDiv = document.getElementById('testResult');
-            resultDiv.style.display = 'block';
-            resultDiv.textContent = 'Enviando...';
+        // Teste da API (apenas para admin)
+        const apiTestForm = document.getElementById('apiTestForm');
+        if (apiTestForm) {
+            apiTestForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const resultDiv = document.getElementById('testResult');
+                resultDiv.style.display = 'block';
+                resultDiv.textContent = 'Enviando...';
 
-            const formData = new FormData(this);
-            formData.append('action', 'testApiSend');
+                const formData = new FormData(this);
+                formData.append('action', 'testApiSend');
 
-            // Adicionar o token CSRF ao FormData para o fetch
-            const csrfToken = document.querySelector('#apiTestForm input[name="csrf_token"]').value;
-            if (csrfToken) {
-                formData.append('csrf_token', csrfToken);
-            }
+                // Adicionar o token CSRF ao FormData para o fetch
+                const csrfToken = document.querySelector('#apiTestForm input[name="csrf_token"]').value;
+                if (csrfToken) {
+                    formData.append('csrf_token', csrfToken);
+                }
 
-            fetch('admin.php', { method: 'POST', body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    resultDiv.textContent = data.message;
-                })
-                .catch(err => {
-                    resultDiv.textContent = 'Erro na requisição: ' + err;
-                });
-        });
+                fetch('admin.php', { method: 'POST', body: formData })
+                    .then(res => res.json())
+                    .then(data => {
+                        resultDiv.textContent = data.message;
+                    })
+                    .catch(err => {
+                        resultDiv.textContent = 'Erro na requisição: ' + err;
+                    });
+            });
+        }
 
         // --- MODAL LOGIC ---
         const modal = document.getElementById('curriculoModal');
@@ -2192,17 +2208,24 @@ $totalCurriculos = $stmt->fetchColumn();
         // --- FUNÇÕES DE GERENCIAMENTO DE USUÁRIOS ---
 
         function showAddUserModal() {
-            document.getElementById('addUserModal').style.display = 'block';
-            document.getElementById('addUserForm').reset();
-            document.getElementById('addUserSuccess').style.display = 'none';
+            const modal = document.getElementById('addUserModal');
+            const form = document.getElementById('addUserForm');
+            const success = document.getElementById('addUserSuccess');
+            if (modal && form && success) {
+                modal.style.display = 'block';
+                form.reset();
+                success.style.display = 'none';
+            }
         }
 
         // Carregar usuários
         function loadUsers() {
+            const tbody = document.getElementById('users-tbody');
+            if (!tbody) return; // Só existe para admin
+
             fetch('admin.php?action=getUsers')
                 .then(res => res.json())
                 .then(data => {
-                    const tbody = document.getElementById('users-tbody');
                     if (data.success && data.users.length > 0) {
                         tbody.innerHTML = data.users.map(u => `
                             <tr>
@@ -2220,26 +2243,29 @@ $totalCurriculos = $stmt->fetchColumn();
                 });
         }
 
-        // Formulário de adicionar usuário
-        document.getElementById('addUserForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            formData.append('action', 'addUser');
+        // Formulário de adicionar usuário (apenas para admin)
+        const addUserForm = document.getElementById('addUserForm');
+        if (addUserForm) {
+            addUserForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                formData.append('action', 'addUser');
 
-            fetch('admin.php', { method: 'POST', body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    const msgDiv = document.getElementById('addUserSuccess');
-                    msgDiv.textContent = data.message;
-                    msgDiv.style.display = 'block';
-                    if (data.success) {
-                        loadUsers();
-                        setTimeout(() => {
-                            document.getElementById('addUserModal').style.display = 'none';
-                        }, 2000);
-                    }
-                });
-        });
+                fetch('admin.php', { method: 'POST', body: formData })
+                    .then(res => res.json())
+                    .then(data => {
+                        const msgDiv = document.getElementById('addUserSuccess');
+                        msgDiv.textContent = data.message;
+                        msgDiv.style.display = 'block';
+                        if (data.success) {
+                            loadUsers();
+                            setTimeout(() => {
+                                document.getElementById('addUserModal').style.display = 'none';
+                            }, 2000);
+                        }
+                    });
+            });
+        }
 
         function deleteUser(id, element) {
             if (!confirm('Tem certeza que deseja deletar este usuário? Esta ação não pode ser desfeita.')) {
@@ -2262,7 +2288,8 @@ $totalCurriculos = $stmt->fetchColumn();
                     } else {
                         alert('Erro: ' + data.message);
                     }
-                });
+                })
+                .catch(err => alert('Erro de comunicação com o servidor.'));
         }
 
         // Carregamento inicial
