@@ -1,14 +1,47 @@
-# Proibir execução de scripts PHP
-<FilesMatch "\.(php|php5|phtml|pl|py|jsp|asp|htm|html|shtml|sh|cgi)$">
+# ========================================
+# PROTEÇÃO DO DIRETÓRIO DE UPLOADS
+# ========================================
+
+# Desabilitar listagem de diretórios
+Options -Indexes
+
+# Desabilitar execução de PHP
+php_flag engine off
+
+# Bloquear todos os scripts
+<FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|jsp|asp|sh|cgi|exe|bat|com)$">
     Order Allow,Deny
     Deny from all
 </FilesMatch>
 
-# Permitir apenas acesso a arquivos estáticos seguros
+# Permitir apenas arquivos de imagem e PDF
 <FilesMatch "\.(jpg|jpeg|png|gif|pdf)$">
-    Order Deny,Allow
+    Order Allow,Deny
     Allow from all
 </FilesMatch>
 
-# Desabilitar listagem de diretório
-Options -Indexes
+# Bloquear arquivos .htaccess
+<Files .htaccess>
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+# Headers de segurança para downloads
+<IfModule mod_headers.c>
+    # Forçar download ao invés de exibir no navegador (para PDFs)
+    <FilesMatch "\.pdf$">
+        Header set Content-Disposition "attachment"
+        Header set X-Content-Type-Options "nosniff"
+    </FilesMatch>
+    
+    # Para imagens, permitir exibição
+    <FilesMatch "\.(jpg|jpeg|png|gif)$">
+        Header set X-Content-Type-Options "nosniff"
+    </FilesMatch>
+</IfModule>
+
+# Bloquear acesso a arquivos temporários e de backup
+<FilesMatch "\.(bak|backup|old|tmp|temp|swp|~)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>

@@ -1,0 +1,195 @@
+# ========================================
+# PROTEÇÃO DO SISTEMA DE CURRÍCULOS
+# GOR INFORMÁTICA
+# ========================================
+
+# Desabilitar listagem de diretórios
+Options -Indexes
+
+# Habilitar FollowSymLinks (necessário para RewriteEngine)
+Options +FollowSymLinks
+
+# Habilitar RewriteEngine
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+</IfModule>
+
+# ========================================
+# PROTEÇÃO DE ARQUIVOS SENSÍVEIS
+# ========================================
+
+# Bloquear acesso a arquivos de configuração e logs
+<FilesMatch "\.(log|md|sql|json|bak|old|txt|env|ini|conf)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Permitir acesso apenas aos arquivos HTML de documentação específicos
+<FilesMatch "^(COMECE_AQUI|CHECKLIST_ATUALIZACAO|PLANO_DE_TAREFAS|TRABALHO_CONCLUIDO|index_documentacao|INSTALACAO_CONTATOS)\.html$">
+    Order Allow,Deny
+    Allow from all
+</FilesMatch>
+
+# Bloquear acesso a arquivos de backup
+<FilesMatch "\.(bak|backup|old|orig|save|swp|tmp)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Proteger arquivos Git
+<FilesMatch "^\.git">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Proteger arquivos de configuração do sistema
+<FilesMatch "^(\.htaccess|\.htpasswd|\.env|config\.php|db_connect\.php)$">
+    Order Allow,Deny
+    Deny from all
+    # Permitir apenas para localhost (desenvolvimento)
+    Allow from 127.0.0.1
+    Allow from ::1
+</FilesMatch>
+
+# ========================================
+# PROTEÇÃO DE DIRETÓRIOS
+# ========================================
+
+# Bloquear acesso direto ao diretório de backups
+<IfModule mod_rewrite.c>
+    RewriteRule ^backups/ - [F,L]
+</IfModule>
+
+# Bloquear acesso a diretórios ocultos
+RedirectMatch 403 /\..*$
+
+# ========================================
+# SEGURANÇA DE UPLOADS
+# ========================================
+
+# Bloquear execução de scripts no diretório de uploads
+<Directory "uploads">
+    # Desabilitar execução de PHP
+    php_flag engine off
+    
+    # Bloquear scripts
+    <FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|jsp|asp|sh|cgi)$">
+        Order Allow,Deny
+        Deny from all
+    </FilesMatch>
+    
+    # Permitir apenas arquivos de imagem e PDF
+    <FilesMatch "\.(jpg|jpeg|png|gif|pdf)$">
+        Order Allow,Deny
+        Allow from all
+    </FilesMatch>
+</Directory>
+
+# ========================================
+# HEADERS DE SEGURANÇA
+# ========================================
+
+<IfModule mod_headers.c>
+    # Prevenir clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+    
+    # Prevenir MIME type sniffing
+    Header always set X-Content-Type-Options "nosniff"
+    
+    # Habilitar proteção XSS do navegador
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # Política de referrer
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # Content Security Policy (ajuste conforme necessário)
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self';"
+    
+    # Remover informações do servidor
+    Header unset Server
+    Header unset X-Powered-By
+</IfModule>
+
+# ========================================
+# PROTEÇÃO CONTRA HOTLINKING
+# ========================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Permitir acesso direto e do próprio domínio
+    RewriteCond %{HTTP_REFERER} !^$
+    RewriteCond %{HTTP_REFERER} !^https?://(www\.)?seu-dominio\.com [NC]
+    # Bloquear hotlinking de imagens e PDFs
+    RewriteRule \.(jpg|jpeg|png|gif|pdf)$ - [F,L]
+</IfModule>
+
+# ========================================
+# COMPRESSÃO E CACHE (PERFORMANCE)
+# ========================================
+
+# Habilitar compressão GZIP
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+
+# Cache de arquivos estáticos
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/gif "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+    ExpiresByType application/pdf "access plus 1 month"
+</IfModule>
+
+# ========================================
+# PROTEÇÃO CONTRA ATAQUES
+# ========================================
+
+# Bloquear requisições com user agents suspeitos
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTP_USER_AGENT} ^$ [OR]
+    RewriteCond %{HTTP_USER_AGENT} ^(-|curl|wget|libwww-perl|python|nikto|scan|java|winhttp|HTTrack|clshttp|archiver|loader|email|harvest|extract|grab|miner) [NC]
+    RewriteRule .* - [F,L]
+</IfModule>
+
+# Bloquear requisições com query strings suspeitas
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Bloquear SQL injection
+    RewriteCond %{QUERY_STRING} (\<|%3C).*script.*(\>|%3E) [NC,OR]
+    RewriteCond %{QUERY_STRING} GLOBALS(=|\[|\%[0-9A-Z]{0,2}) [OR]
+    RewriteCond %{QUERY_STRING} _REQUEST(=|\[|\%[0-9A-Z]{0,2}) [OR]
+    RewriteCond %{QUERY_STRING} (union|select|insert|drop|delete|update|cast|create|char|convert|alter|declare|exec|script|set|md5|benchmark) [NC]
+    RewriteRule .* - [F,L]
+</IfModule>
+
+# ========================================
+# LIMITE DE TAMANHO DE UPLOAD
+# ========================================
+
+# Limite de 10MB para uploads (ajuste conforme necessário)
+php_value upload_max_filesize 10M
+php_value post_max_size 10M
+
+# ========================================
+# PÁGINA DE ERRO PERSONALIZADA
+# ========================================
+
+# ErrorDocument 403 /403.html
+# ErrorDocument 404 /404.html
+# ErrorDocument 500 /500.html
+
+# ========================================
+# FORÇAR HTTPS (Descomente se tiver SSL)
+# ========================================
+
+# <IfModule mod_rewrite.c>
+#     RewriteEngine On
+#     RewriteCond %{HTTPS} off
+#     RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>
