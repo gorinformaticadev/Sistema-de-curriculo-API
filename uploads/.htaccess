@@ -1,47 +1,8 @@
-# ========================================
-# PROTEÇÃO DO DIRETÓRIO DE UPLOADS
-# ========================================
-
-# Desabilitar listagem de diretórios
+# Proteção do diretório de uploads
 Options -Indexes
 
-# Desabilitar execução de PHP
-php_flag engine off
-
-# Bloquear todos os scripts
-<FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|jsp|asp|sh|cgi|exe|bat|com)$">
-    Order Allow,Deny
-    Deny from all
-</FilesMatch>
-
-# Permitir apenas arquivos de imagem e PDF
-<FilesMatch "\.(jpg|jpeg|png|gif|pdf)$">
-    Order Allow,Deny
-    Allow from all
-</FilesMatch>
-
-# Bloquear arquivos .htaccess
-<Files .htaccess>
-    Order Allow,Deny
-    Deny from all
-</Files>
-
-# Headers de segurança para downloads
-<IfModule mod_headers.c>
-    # Forçar download ao invés de exibir no navegador (para PDFs)
-    <FilesMatch "\.pdf$">
-        Header set Content-Disposition "attachment"
-        Header set X-Content-Type-Options "nosniff"
-    </FilesMatch>
-    
-    # Para imagens, permitir exibição
-    <FilesMatch "\.(jpg|jpeg|png|gif)$">
-        Header set X-Content-Type-Options "nosniff"
-    </FilesMatch>
-</IfModule>
-
-# Bloquear acesso a arquivos temporários e de backup
-<FilesMatch "\.(bak|backup|old|tmp|temp|swp|~)$">
+# Bloquear scripts PHP
+<FilesMatch "\.(php|php3|php4|php5|phtml)$">
     Order Allow,Deny
     Deny from all
 </FilesMatch>
