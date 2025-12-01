@@ -267,3 +267,16 @@
 [2025-11-26 18:40:46] [INFO] [IP: ::1] Tentativa de login para email: gilsonoliverr@gmail.com
 [2025-11-26 18:40:46] [INFO] [IP: ::1] Usuário encontrado: gilsonoliverr@gmail.com, tipo: admin, senha hash: $2y$10$Jvu...
 [2025-11-26 18:40:46] [INFO] [IP: ::1] Login bem-sucedido para usuário gilsonoliverr@gmail.com (tipo: admin)
+[2025-12-01 20:03:03] [INFO] [IP: ::1] Tentativa de login para email: gilsonoliverr@gmail.com
+[2025-12-01 20:03:03] [INFO] [IP: ::1] Usuário encontrado: gilsonoliverr@gmail.com, tipo: admin, senha hash: $2y$10$Jvu...
+[2025-12-01 20:03:03] [INFO] [IP: ::1] Login bem-sucedido para usuário gilsonoliverr@gmail.com (tipo: admin)
+[2025-12-01 20:07:38] [ERROR] [IP: ::1] Erro ao adicionar informação de contato: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'gor_informatica.curriculo_contatos' doesn't exist
+[2025-12-01 20:07:41] [ERROR] [IP: ::1] Erro ao adicionar informação de contato: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'gor_informatica.curriculo_contatos' doesn't exist
+[2025-12-01 20:08:18] [ERROR] [IP: ::1] Erro ao adicionar informação de contato: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'gor_informatica.curriculo_contatos' doesn't exist
+[2025-12-01 20:08:22] [ERROR] [IP: ::1] Erro ao adicionar informação de contato: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'gor_informatica.curriculo_contatos' doesn't exist
+[2025-12-01 20:08:23] [ERROR] [IP: ::1] Erro ao adicionar informação de contato: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'gor_informatica.curriculo_contatos' doesn't exist
+[2025-12-01 20:09:01] [ERROR] [IP: ::1] Erro ao adicionar informação de contato: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'gor_informatica.curriculo_contatos' doesn't exist
+[2025-12-01 20:09:41] [ERROR] [IP: ::1] Erro ao adicionar informação de contato: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'gor_informatica.curriculo_contatos' doesn't exist
+[2025-12-01 20:10:25] [ERROR] [IP: ::1] Erro ao adicionar informação de contato: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'gor_informatica.curriculo_contatos' doesn't exist
+[2025-12-01 20:10:26] [ERROR] [IP: ::1] Erro ao adicionar informação de contato: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'gor_informatica.curriculo_contatos' doesn't exist
+[2025-12-01 20:11:34] [INFO] [IP: ::1] Nova informação de contato adicionada ao currículo ID: 2 por gilsonoliverr@gmail.com

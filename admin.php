@@ -970,6 +970,171 @@ if (isAdmin()) {
         }
         exit;
     }
+
+    // API para buscar informações de contato
+    if (isset($_GET['action']) && $_GET['action'] === 'getContactInfo' && canAccessAction('getContactInfo')) {
+        header('Content-Type: application/json');
+
+        $curriculoId = filter_input(INPUT_GET, 'curriculo_id', FILTER_VALIDATE_INT);
+
+        if (!$curriculoId) {
+            echo json_encode(['success' => false, 'message' => 'ID do currículo inválido.']);
+            exit;
+        }
+
+        try {
+            $stmt = $pdo->prepare("
+                SELECT
+                    id,
+                    tipo_contato,
+                    informacao,
+                    observacoes,
+                    registrado_por,
+                    data_registro
+                FROM curriculo_contatos
+                WHERE curriculo_id = ?
+                ORDER BY data_registro DESC
+            ");
+            $stmt->execute([$curriculoId]);
+            $contacts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            echo json_encode([
+                'success' => true,
+                'contacts' => $contacts
+            ]);
+
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // API para adicionar informação de contato
+    if (isset($_POST['action']) && $_POST['action'] === 'addContactInfo' && canAccessAction('addContactInfo')) {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        $curriculoId = filter_input(INPUT_POST, 'curriculo_id', FILTER_VALIDATE_INT);
+        $tipoContato = trim($_POST['tipo_contato'] ?? '');
+        $informacao = trim($_POST['informacao'] ?? '');
+        $observacoes = trim($_POST['observacoes'] ?? '');
+
+        if (!$curriculoId) {
+            echo json_encode(['success' => false, 'message' => 'ID do currículo inválido.']);
+            exit;
+        }
+
+        if (empty($tipoContato) || empty($informacao)) {
+            echo json_encode(['success' => false, 'message' => 'Tipo de contato e informação são obrigatórios.']);
+            exit;
+        }
+
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO curriculo_contatos 
+                (curriculo_id, tipo_contato, informacao, observacoes, registrado_por, data_registro)
+                VALUES (?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->execute([
+                $curriculoId,
+                $tipoContato,
+                $informacao,
+                $observacoes,
+                $_SESSION['user_email']
+            ]);
+
+            logError("Nova informação de contato adicionada ao currículo ID: $curriculoId por {$_SESSION['user_email']}", 'INFO');
+            echo json_encode(['success' => true, 'message' => 'Informação adicionada com sucesso!']);
+
+        } catch (Exception $e) {
+            logError('Erro ao adicionar informação de contato: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erro ao adicionar informação: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // API para atualizar informação de contato
+    if (isset($_POST['action']) && $_POST['action'] === 'updateContactInfo' && canAccessAction('updateContactInfo')) {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        $contactId = filter_input(INPUT_POST, 'contact_id', FILTER_VALIDATE_INT);
+        $curriculoId = filter_input(INPUT_POST, 'curriculo_id', FILTER_VALIDATE_INT);
+        $tipoContato = trim($_POST['tipo_contato'] ?? '');
+        $informacao = trim($_POST['informacao'] ?? '');
+        $observacoes = trim($_POST['observacoes'] ?? '');
+
+        if (!$contactId || !$curriculoId) {
+            echo json_encode(['success' => false, 'message' => 'IDs inválidos.']);
+            exit;
+        }
+
+        if (empty($tipoContato) || empty($informacao)) {
+            echo json_encode(['success' => false, 'message' => 'Tipo de contato e informação são obrigatórios.']);
+            exit;
+        }
+
+        try {
+            $stmt = $pdo->prepare("
+                UPDATE curriculo_contatos 
+                SET tipo_contato = ?, informacao = ?, observacoes = ?
+                WHERE id = ? AND curriculo_id = ?
+            ");
+            $stmt->execute([
+                $tipoContato,
+                $informacao,
+                $observacoes,
+                $contactId,
+                $curriculoId
+            ]);
+
+            logError("Informação de contato ID: $contactId atualizada por {$_SESSION['user_email']}", 'INFO');
+            echo json_encode(['success' => true, 'message' => 'Informação atualizada com sucesso!']);
+
+        } catch (Exception $e) {
+            logError('Erro ao atualizar informação de contato: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erro ao atualizar informação: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // API para deletar informação de contato
+    if (isset($_POST['action']) && $_POST['action'] === 'deleteContactInfo' && canAccessAction('deleteContactInfo')) {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        $contactId = filter_input(INPUT_POST, 'contact_id', FILTER_VALIDATE_INT);
+
+        if (!$contactId) {
+            echo json_encode(['success' => false, 'message' => 'ID inválido.']);
+            exit;
+        }
+
+        try {
+            $stmt = $pdo->prepare("DELETE FROM curriculo_contatos WHERE id = ?");
+            $stmt->execute([$contactId]);
+
+            logError("Informação de contato ID: $contactId deletada por {$_SESSION['user_email']}", 'INFO');
+            echo json_encode(['success' => true, 'message' => 'Informação deletada com sucesso!']);
+
+        } catch (Exception $e) {
+            logError('Erro ao deletar informação de contato: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erro ao deletar informação: ' . $e->getMessage()]);
+        }
+        exit;
+    }
 }
 
 
@@ -1488,7 +1653,7 @@ $totalCurriculos = $stmt->fetchColumn();
                     </div>
 
                     <table class="curriculos-table">
-                        <thead><tr><th>Data/Hora</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Cidade</th><th>Status</th><th>Ações</th></tr></thead>
+                        <thead><tr><th>Data/Hora</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Cidade</th><th>Status</th><th>Contato</th><th>Ações</th></tr></thead>
                         <tbody id="curriculos-tbody">
                             <!-- Conteúdo carregado via JS -->
                         </tbody>
@@ -1879,6 +2044,11 @@ $totalCurriculos = $stmt->fetchColumn();
                                     <td>${c.email || 'N/A'}</td>
                                     <td>${c.cidade}</td>
                                     <td>${statusHtml}</td>
+                                    <td style="text-align: center;">
+                                        <button class="btn-small" onclick="openContactInfoModal(${c.id}, '${c.nome.replace(/'/g, "\\'")}')" style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer;" title="Informações de Contato">
+                                            <i class="fas fa-address-book"></i>
+                                        </button>
+                                    </td>
                                     <td>
                                         <button class="btn-primary btn-small" onclick="viewCurriculo(${c.id})"><i class="fas fa-eye"></i> Ver</button>
                                         <select class="status-select" onchange="changeStatus(${c.id}, this.value)" style="margin-left: 5px; padding: 2px 5px; font-size: 0.8rem;">
@@ -1894,13 +2064,13 @@ $totalCurriculos = $stmt->fetchColumn();
                             `;
                         }).join('');
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="7">Nenhum currículo encontrado.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="8">Nenhum currículo encontrado.</td></tr>';
                     }
                 })
                 .catch(err => {
                     console.error('Erro ao carregar currículos:', err);
                     const tbody = document.getElementById('curriculos-tbody');
-                    tbody.innerHTML = '<tr><td colspan="7">Erro ao carregar currículos.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8">Erro ao carregar currículos.</td></tr>';
                 });
         }
 
@@ -2992,6 +3162,268 @@ Equipe de RH</textarea>
                 });
         }
 
+        // Função para abrir modal de informações de contato
+        function openContactInfoModal(curriculoId, nome) {
+            const modal = document.getElementById('contactInfoModal');
+            const modalContent = document.getElementById('contactInfoModalContent');
+
+            modalContent.innerHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <i class="fas fa-address-book" style="font-size: 3rem; color: #3b82f6; margin-bottom: 10px;"></i>
+                    <h3 style="margin: 0; color: #1f2937;">Informações de Contato</h3>
+                    <p style="margin: 5px 0 0 0; color: #6b7280;">${nome}</p>
+                </div>
+
+                <div id="contactInfoContent" style="margin-bottom: 20px;">
+                    <p style="text-align: center; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Carregando...</p>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="document.getElementById('contactInfoModal').style.display='none'" style="background: #6b7280; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                        Fechar
+                    </button>
+                    <button onclick="showAddContactForm(${curriculoId})" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                        <i class="fas fa-plus"></i> Adicionar Informação
+                    </button>
+                </div>
+            `;
+
+            modal.style.display = 'block';
+            loadContactInfo(curriculoId);
+        }
+
+        // Função para carregar informações de contato
+        function loadContactInfo(curriculoId) {
+            fetch(`admin.php?action=getContactInfo&curriculo_id=${curriculoId}`)
+                .then(res => res.json())
+                .then(data => {
+                    const contentDiv = document.getElementById('contactInfoContent');
+                    
+                    if (data.success && data.contacts.length > 0) {
+                        let html = '<div style="max-height: 400px; overflow-y: auto;">';
+                        data.contacts.forEach(contact => {
+                            const dataFormatada = new Date(contact.data_registro).toLocaleString('pt-BR');
+                            html += `
+                                <div style="margin-bottom: 15px; padding: 15px; background: #f8fafc; border-radius: 8px; border-left: 3px solid #3b82f6;">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600; color: #1f2937; margin-bottom: 5px;">
+                                                <i class="fas fa-tag"></i> ${contact.tipo_contato}
+                                            </div>
+                                            <div style="color: #374151; margin-bottom: 8px;">
+                                                ${contact.informacao.replace(/\n/g, '<br>')}
+                                            </div>
+                                            ${contact.observacoes ? `
+                                                <div style="color: #6b7280; font-size: 0.9rem; font-style: italic;">
+                                                    <i class="fas fa-comment"></i> ${contact.observacoes}
+                                                </div>
+                                            ` : ''}
+                                            <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 8px;">
+                                                <i class="fas fa-clock"></i> ${dataFormatada} | <i class="fas fa-user"></i> ${contact.registrado_por}
+                                            </div>
+                                        </div>
+                                        <div style="display: flex; gap: 5px;">
+                                            <button onclick="editContactInfo(${contact.id}, ${curriculoId})" style="background: #f59e0b; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button onclick="deleteContactInfo(${contact.id}, ${curriculoId})" style="background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                        contentDiv.innerHTML = html;
+                    } else {
+                        contentDiv.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">Nenhuma informação de contato registrada ainda.</p>';
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar informações:', err);
+                    document.getElementById('contactInfoContent').innerHTML = '<p style="color: #ef4444; text-align: center;">Erro ao carregar informações.</p>';
+                });
+        }
+
+        // Função para mostrar formulário de adicionar contato
+        function showAddContactForm(curriculoId) {
+            const contentDiv = document.getElementById('contactInfoContent');
+            contentDiv.innerHTML = `
+                <div style="background: white; padding: 20px; border-radius: 8px; border: 2px solid #3b82f6;">
+                    <h4 style="margin-top: 0; color: #1f2937;"><i class="fas fa-plus-circle"></i> Nova Informação de Contato</h4>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #374151;">Tipo de Contato:</label>
+                        <select id="newContactType" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <option value="Telefone Adicional">Telefone Adicional</option>
+                            <option value="Email Adicional">Email Adicional</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                            <option value="LinkedIn">LinkedIn</option>
+                            <option value="Endereço">Endereço</option>
+                            <option value="Contato de Emergência">Contato de Emergência</option>
+                            <option value="Referência">Referência</option>
+                            <option value="Outro">Outro</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #374151;">Informação:</label>
+                        <textarea id="newContactInfo" rows="3" placeholder="Digite a informação..." style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; resize: vertical;"></textarea>
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #374151;">Observações (opcional):</label>
+                        <textarea id="newContactObs" rows="2" placeholder="Observações adicionais..." style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; resize: vertical;"></textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button onclick="loadContactInfo(${curriculoId})" style="background: #6b7280; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                            Cancelar
+                        </button>
+                        <button onclick="saveContactInfo(${curriculoId})" style="background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                            <i class="fas fa-save"></i> Salvar
+                        </button>
+                    </div>
+
+                    <div id="contactFormStatus" style="margin-top: 15px; text-align: center;"></div>
+                </div>
+            `;
+        }
+
+        // Função para salvar informação de contato
+        function saveContactInfo(curriculoId, contactId = null) {
+            const tipo = document.getElementById('newContactType').value;
+            const informacao = document.getElementById('newContactInfo').value.trim();
+            const observacoes = document.getElementById('newContactObs').value.trim();
+            const statusDiv = document.getElementById('contactFormStatus');
+
+            if (!informacao) {
+                statusDiv.textContent = 'Por favor, preencha a informação.';
+                statusDiv.style.color = '#ef4444';
+                return;
+            }
+
+            statusDiv.textContent = 'Salvando...';
+            statusDiv.style.color = '#6b7280';
+
+            const formData = new FormData();
+            formData.append('action', contactId ? 'updateContactInfo' : 'addContactInfo');
+            formData.append('curriculo_id', curriculoId);
+            formData.append('tipo_contato', tipo);
+            formData.append('informacao', informacao);
+            formData.append('observacoes', observacoes);
+            if (contactId) formData.append('contact_id', contactId);
+
+            const csrfToken = document.querySelector('input[name="csrf_token"]');
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken.value);
+            }
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        statusDiv.textContent = 'Salvo com sucesso!';
+                        statusDiv.style.color = '#10b981';
+                        setTimeout(() => loadContactInfo(curriculoId), 1000);
+                    } else {
+                        statusDiv.textContent = data.message || 'Erro ao salvar.';
+                        statusDiv.style.color = '#ef4444';
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao salvar:', err);
+                    statusDiv.textContent = 'Erro de conexão.';
+                    statusDiv.style.color = '#ef4444';
+                });
+        }
+
+        // Função para editar informação de contato
+        function editContactInfo(contactId, curriculoId) {
+            fetch(`admin.php?action=getContactInfo&curriculo_id=${curriculoId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const contact = data.contacts.find(c => c.id == contactId);
+                        if (contact) {
+                            const contentDiv = document.getElementById('contactInfoContent');
+                            contentDiv.innerHTML = `
+                                <div style="background: white; padding: 20px; border-radius: 8px; border: 2px solid #f59e0b;">
+                                    <h4 style="margin-top: 0; color: #1f2937;"><i class="fas fa-edit"></i> Editar Informação de Contato</h4>
+                                    
+                                    <div style="margin-bottom: 15px;">
+                                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #374151;">Tipo de Contato:</label>
+                                        <select id="newContactType" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                                            <option value="Telefone Adicional" ${contact.tipo_contato === 'Telefone Adicional' ? 'selected' : ''}>Telefone Adicional</option>
+                                            <option value="Email Adicional" ${contact.tipo_contato === 'Email Adicional' ? 'selected' : ''}>Email Adicional</option>
+                                            <option value="WhatsApp" ${contact.tipo_contato === 'WhatsApp' ? 'selected' : ''}>WhatsApp</option>
+                                            <option value="LinkedIn" ${contact.tipo_contato === 'LinkedIn' ? 'selected' : ''}>LinkedIn</option>
+                                            <option value="Endereço" ${contact.tipo_contato === 'Endereço' ? 'selected' : ''}>Endereço</option>
+                                            <option value="Contato de Emergência" ${contact.tipo_contato === 'Contato de Emergência' ? 'selected' : ''}>Contato de Emergência</option>
+                                            <option value="Referência" ${contact.tipo_contato === 'Referência' ? 'selected' : ''}>Referência</option>
+                                            <option value="Outro" ${contact.tipo_contato === 'Outro' ? 'selected' : ''}>Outro</option>
+                                        </select>
+                                    </div>
+
+                                    <div style="margin-bottom: 15px;">
+                                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #374151;">Informação:</label>
+                                        <textarea id="newContactInfo" rows="3" placeholder="Digite a informação..." style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; resize: vertical;">${contact.informacao}</textarea>
+                                    </div>
+
+                                    <div style="margin-bottom: 15px;">
+                                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #374151;">Observações (opcional):</label>
+                                        <textarea id="newContactObs" rows="2" placeholder="Observações adicionais..." style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; resize: vertical;">${contact.observacoes || ''}</textarea>
+                                    </div>
+
+                                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                                        <button onclick="loadContactInfo(${curriculoId})" style="background: #6b7280; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                                            Cancelar
+                                        </button>
+                                        <button onclick="saveContactInfo(${curriculoId}, ${contactId})" style="background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                            <i class="fas fa-save"></i> Atualizar
+                                        </button>
+                                    </div>
+
+                                    <div id="contactFormStatus" style="margin-top: 15px; text-align: center;"></div>
+                                </div>
+                            `;
+                        }
+                    }
+                })
+                .catch(err => console.error('Erro ao carregar contato:', err));
+        }
+
+        // Função para deletar informação de contato
+        function deleteContactInfo(contactId, curriculoId) {
+            if (!confirm('Tem certeza que deseja deletar esta informação de contato?')) {
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('action', 'deleteContactInfo');
+            formData.append('contact_id', contactId);
+
+            const csrfToken = document.querySelector('input[name="csrf_token"]');
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken.value);
+            }
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        loadContactInfo(curriculoId);
+                    } else {
+                        alert(data.message || 'Erro ao deletar.');
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao deletar:', err);
+                    alert('Erro de conexão.');
+                });
+        }
+
         // Carregamento inicial
         document.addEventListener('DOMContentLoaded', function() {
             if (userType === 'admin' || userType === 'analisador') {
@@ -3008,5 +3440,13 @@ Equipe de RH</textarea>
             }
         });
     </script>
+
+    <!-- Modal de Informações de Contato -->
+    <div id="contactInfoModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="close" onclick="document.getElementById('contactInfoModal').style.display='none'">&times;</span>
+            <div id="contactInfoModalContent"></div>
+        </div>
+    </div>
 </body>
 </html>
