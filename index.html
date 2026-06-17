@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -86,6 +86,10 @@
                 </div>
 
                 <form id="curriculumForm" enctype="multipart/form-data">
+                    <!-- Honeypot anti-spam: campo invisivel para humanos -->
+                    <div style="position: absolute; left: -9999px;" aria-hidden="true">
+                        <input type="text" name="website" tabindex="-1" autocomplete="off">
+                    </div>
                     <!-- Terms Section -->
                     <div class="form-section">
                         <div class="form-group">
@@ -407,24 +411,12 @@
                 <p id="successText"></p>
                 <button id="newRegistration" class="btn-primary">Novo Cadastro</button>
             </div>
-                </div>
-            </div>
-        </main>
-
-        <!-- Success Message -->
-        <div id="successMessage" class="success-screen" style="display: none;">
-            <div class="success-content">
-                <div class="success-icon">
-                    <i class="fas fa-check-circle"></i>
-                </div>
-                <h2>Currículo Enviado!</h2>
-                <p id="successText"></p>
-                <button id="newRegistration" class="btn-primary">Novo Cadastro</button>
-            </div>
         </div>
+    </main>
+
     </div>
 
     <script src="form-tracker.js"></script>
-    <script src="script.js"></script>
+    
 </body>
 </html>

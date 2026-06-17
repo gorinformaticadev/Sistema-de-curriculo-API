@@ -5,6 +5,10 @@
  */
 
 require_once 'includes/migration.php';
+// Verificar se o sistema ja foi instalado (bloqueio de seguranca)
+$lockFile = __DIR__ . '/install.lock';
+$isLocked = file_exists($lockFile);
+$lockInfo = $isLocked ? json_decode(file_get_contents($lockFile), true) : null;
 
 /**
  * Classe para Backup do Sistema
@@ -287,6 +291,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $adminPass = trim($_POST['admin_pass'] ?? '');
 
     $errors = [];
+    // Bloquear instalacao se sistema ja foi instalado
+    if ($isLocked && $installMode === 'install') {
+        $errors[] = 'Sistema ja instalado. Remova install.lock para reinstalar.';
+    }
     $warnings = [];
     $success = false;
     $steps = [];
@@ -476,6 +484,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $success = true;
+
+            // Criar/atualizar arquivo de bloqueio
+            $lockData = json_encode([
+                'installed_at' => date('Y-m-d H:i:s'),
+                'version' => '1.0',
+                'mode' => $installMode
+            ], JSON_PRETTY_PRINT);
+            file_put_contents($lockFile, $lockData);
+            $steps[] = 'Arquivo install.lock criado/atualizado por seguranca.';
 
         } catch (PDOException $e) {
             $errors[] = "Erro de banco de dados: " . $e->getMessage();
@@ -777,6 +794,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     <?php endif; ?>
 <?php else: ?>
+    <?php if ($isLocked): ?>
+        <div class="alert alert-warning">
+            <h3>ðŸ”’ Sistema JÃ¡ Instalado</h3>
+            <p>Instalado em: <strong><?php echo htmlspecialchars($lockInfo['installed_at'] ?? 'desconhecido'); ?></strong></p>
+            <p>VersÃ£o: <strong><?php echo htmlspecialchars($lockInfo['version'] ?? 'desconhecida'); ?></strong></p>
+            <p>Remova <code>install.lock</code> do servidor para reinstalar.</p>
+            <a href="index.html" class="back-link">â† Voltar ao site</a>
+        </div>
+    <?php else: ?>
     <form method="POST" action="install.php" id="installForm">
         <div class="version-info">
             <strong>💡 Dica:</strong> Use "Atualizar Sistema" para manter todos os dados existentes
@@ -864,6 +890,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Inicializar modo
         toggleMode();
     </script>
+    <?php endif; ?>
 <?php endif; ?>
     </div>
 </body>
