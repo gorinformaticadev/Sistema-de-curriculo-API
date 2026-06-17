@@ -1,7 +1,17 @@
-<?php
+﻿﻿<?php
 // Interactive installer for the system with modern design
 
+// Verificar se o sistema ja foi instalado (bloqueio de seguranca)
+$lockFile = __DIR__ . '/install.lock';
+$isLocked = file_exists($lockFile);
+$lockInfo = $isLocked ? json_decode(file_get_contents($lockFile), true) : null;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Bloquear POST se sistema ja foi instalado
+    if ($isLocked) {
+        $errors[] = 'Sistema ja instalado. Remova install.lock para reinstalar.';
+    }
+
     $dbName = trim($_POST['db_name'] ?? '');
     $dbUser = trim($_POST['db_user'] ?? 'root');
     $dbPass = trim($_POST['db_pass'] ?? '');
@@ -121,6 +131,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $success = true;
+
+            // Criar arquivo de bloqueio
+            $lockData = json_encode([
+                'installed_at' => date('Y-m-d H:i:s'),
+                'version' => '2.0'
+            ], JSON_PRETTY_PRINT);
+            file_put_contents($lockFile, $lockData);
+            $steps[] = 'Arquivo install.lock criado por seguranca.';
 
             // Atualizar o arquivo db_connect.php com as configurações do banco de dados fornecidas
             $dbConnectPath = __DIR__ . '/db_connect.php';
@@ -278,10 +296,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <li><?php echo htmlspecialchars($step); ?></li>
                 <?php endforeach; ?>
             </ul>
-            <p>Por segurança, remova ou renomeie o arquivo <code>install.php</code> agora.</p>
+            <p>Arquivo <code>install.lock</code> criado. O instalador está bloqueado. Por segurança adicional, remova ou renomeie o arquivo <code>install.php</code>.</p>
         </div>
     <?php endif; ?>
 <?php else: ?>
+    <?php if ($isLocked): ?>
+        <div style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+            <h3>Sistema Ja Instalado</h3>
+            <p>Instalado em: <strong><?php echo htmlspecialchars($lockInfo['installed_at'] ?? 'desconhecido'); ?></strong></p>
+            <p>Versao: <strong><?php echo htmlspecialchars($lockInfo['version'] ?? 'desconhecida'); ?></strong></p>
+            <p>Remova <code>install.lock</code> do servidor para reinstalar.</p>
+            <a href="index.html" style="display: inline-block; margin-top: 15px; text-decoration: none; color: #007bff; font-weight: 600;">Voltar ao site</a>
+        </div>
+    <?php else: ?>
     <form method="POST" action="install.php">
         <label for="db_name">Nome do Banco de Dados:</label>
         <input type="text" id="db_name" name="db_name" required />
@@ -300,6 +327,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <button type="submit">Instalar</button>
     </form>
+    <?php endif; ?>
     <?php endif; ?>
 </div>
 </body>

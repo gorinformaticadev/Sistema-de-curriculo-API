@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 header('Content-Type: application/json; charset=utf-8');
 
 // Incluir o arquivo de conexão com o banco de dados
@@ -109,6 +109,13 @@ function sendApiMediaMessage($token, $url, $number, $filePath, $fileName) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
+        // --- VERIFICACAO HONEYPOT ANTI-SPAM ---
+        if (!empty($_POST['website'])) {
+            logError('Honeypot triggered - possible bot submission', 'SECURITY');
+            echo json_encode(['success' => true, 'message' => 'Curriculo cadastrado com sucesso!']);
+            exit;
+        }
+
         $config = loadConfigFromDB($pdo);
 
         // Sanitizar e coletar dados do POST
@@ -163,6 +170,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Upload dos arquivos
         $resumeFile = uploadFile($_FILES['resume'], ['pdf'], 'curriculo');
         $photoFile = uploadFile($_FILES['photo'], ['jpg', 'jpeg', 'png', 'gif'], 'foto');
+
+        // --- VERIFICACAO DE DUPLICATA (Nome + Data Nascimento + Telefone) ---
+        $primeiroTelefone = !empty($phones) ? $phones[0] : '';
+        if (!empty($primeiroTelefone) && !empty($formData['name']) && !empty($formData['birthDate'])) {
+            $dupStmt = $pdo->prepare(
+                "SELECT id FROM curriculos WHERE nome = :nome AND data_nascimento = :data_nascimento AND (telefone LIKE :telefone1 OR telefone LIKE :telefone2)"
+            );
+            $dupStmt->execute([
+                ':nome' => $formData['name'],
+                ':data_nascimento' => $formData['birthDate'],
+                ':telefone1' => '%' . $primeiroTelefone . '%',
+                ':telefone2' => '%' . $formData['phone'] . '%'
+            ]);
+            if ($dupStmt->fetch()) {
+                logError('DUPLICATE_DETECTED: Curriculo ja cadastrado para ' . $formData['name'], 'WARNING');
+                echo json_encode(['success' => false, 'message' => 'Este curriculo ja foi cadastrado anteriormente. Nao e necessario envia-lo novamente.']);
+                exit;
+            }
+        }
 
         // Inserir no banco de dados
         $sql = "INSERT INTO curriculos (nome, data_nascimento, estado_civil, telefone, is_whatsapp, email, facebook, instagram, endereco, cidade, estado, escolaridade, estudando, periodo_estudo, possui_cursos, cursos, possui_experiencia, experiencias, motivacao, arquivo_curriculo, arquivo_foto, ip_cadastro) 
@@ -253,22 +279,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $textMessage .= "*Facebook:* " . ($formData['facebook'] ?? 'N/A') . "\n";
             $textMessage .= "*Instagram:* " . ($formData['instagram'] ?? 'N/A') . "\n\n";
 
-            $textMessage .= "_Os arquivos (currículo e foto) serão enviados em seguida._";
-
-
-            $textSuccess = sendApiTextMessage($config['api_token'], $config['api_url'], $config['notification_number'], trim($textMessage));
-            if (!$textSuccess) {
-                throw new Exception("Falha ao enviar notificação de texto via API. Verifique os logs.");
-            }
-
-            $resumeSuccess = sendApiMediaMessage($config['api_token'], $config['api_url'], $config['notification_number'], 'uploads/' . $resumeFile, $resumeFile);
-             if (!$resumeSuccess) {
-                logError("Falha ao enviar o PDF do currículo via API. Continuando...", 'WARNING');
-            }
-
+            // Enviar FOTO primeiro
             $photoSuccess = sendApiMediaMessage($config['api_token'], $config['api_url'], $config['notification_number'], 'uploads/' . $photoFile, $photoFile);
             if (!$photoSuccess) {
                 logError("Falha ao enviar a foto via API. Continuando...", 'WARNING');
+            }
+
+            // Enviar TEXTO com dados depois
+            $textSuccess = sendApiTextMessage($config['api_token'], $config['api_url'], $config['notification_number'], trim($textMessage));
+            if (!$textSuccess) {
+                throw new Exception("Falha ao enviar notificacao de texto via API. Verifique os logs.");
+            }
+
+            // Enviar PDF do curriculo por ultimo
+            $resumeSuccess = sendApiMediaMessage($config['api_token'], $config['api_url'], $config['notification_number'], 'uploads/' . $resumeFile, $resumeFile);
+             if (!$resumeSuccess) {
+                logError("Falha ao enviar o PDF do curriculo via API. Continuando...", 'WARNING');
             }
         } else {
             logError("API Token ou Número de Notificação não configurado. Notificação pulada.", 'WARNING');

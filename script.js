@@ -401,7 +401,12 @@ function resetFormSections() {
 
 // Handle Curriculum Form Submission
 function handleCurriculumSubmit(e) {
-    e.preventDefault();
+    // --- HONEYPOT ANTI-SPAM CHECK ---
+    var websiteField = document.querySelector('input[name="website"]');
+    if (websiteField && websiteField.value.trim() !== '') {
+        return;
+    }
+        e.preventDefault();
     
     console.log('📝 Iniciando envio do currículo (MODO API)...');
     
