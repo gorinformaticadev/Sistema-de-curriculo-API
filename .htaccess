@@ -1,0 +1,58 @@
+# ========================================
+# PROTEÇÃO DO SISTEMA DE CURRÍCULOS
+# GOR INFORMÁTICA
+# ========================================
+
+# Desabilitar listagem de diretórios
+Options -Indexes
+
+# ========================================
+# PROTEÇÃO DE ARQUIVOS SENSÍVEIS
+# ========================================
+
+# Bloquear acesso a arquivos de log
+<FilesMatch "\.(log)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Bloquear acesso a arquivos SQL
+<FilesMatch "\.(sql)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Bloquear acesso a arquivos de backup
+<FilesMatch "\.(bak|backup|old)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Proteger arquivos Git
+<FilesMatch "^\.git">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# ========================================
+# HEADERS DE SEGURANÇA (OPCIONAL)
+# ========================================
+
+<IfModule mod_headers.c>
+    # Prevenir clickjacking
+    Header set X-Frame-Options "SAMEORIGIN"
+    
+    # Prevenir MIME type sniffing
+    Header set X-Content-Type-Options "nosniff"
+    
+    # Habilitar proteção XSS do navegador
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# ========================================
+# COMPRESSÃO GZIP (OPCIONAL)
+# ========================================
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript
+</IfModule>

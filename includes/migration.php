@@ -4,6 +4,31 @@
  * Gerencia atualizações do banco sem perda de dados
  */
 
+/**
+ * Função helper para criar índice apenas se não existir
+ * MySQL não suporta CREATE INDEX IF NOT EXISTS
+ */
+function createIndexIfNotExists($pdo, $indexName, $tableName, $columnName) {
+    try {
+        // Verificar se o índice já existe
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as count
+            FROM information_schema.statistics
+            WHERE table_schema = DATABASE()
+            AND table_name = ?
+            AND index_name = ?
+        ");
+        $stmt->execute([$tableName, $indexName]);
+
+        if ($stmt->fetch()['count'] == 0) {
+            // Índice não existe, criar
+            $pdo->exec("CREATE INDEX {$indexName} ON {$tableName}({$columnName})");
+        }
+    } catch (Exception $e) {
+        // Ignorar erros (índice já existe ou outro problema)
+    }
+}
+
 class DatabaseMigration {
     private $pdo;
     private $versionTable = 'db_version';
@@ -151,9 +176,9 @@ class DatabaseMigration {
                     }
                     
                     // Adicionar índices faltantes
-                    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_config_chave ON config(chave)");
-                    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_curriculos_cidade ON curriculos(cidade)");
-                    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_curriculos_estado ON curriculos(estado)");
+                    createIndexIfNotExists($pdo, 'idx_config_chave', 'config', 'chave');
+                    createIndexIfNotExists($pdo, 'idx_curriculos_cidade', 'curriculos', 'cidade');
+                    createIndexIfNotExists($pdo, 'idx_curriculos_estado', 'curriculos', 'estado');
                     
                     return "Índices e melhorias aplicadas com sucesso";
                 }
@@ -202,7 +227,12 @@ class DatabaseMigration {
                     foreach ($indices as $table => $indexes) {
                         foreach ($indexes as $index) {
                             try {
-                                $pdo->exec("CREATE INDEX IF NOT EXISTS {$index} ON {$table}");
+                                // Extrair nome da coluna do índice (assumindo padrão idx_tabela_coluna)
+                                $parts = explode('_', $index);
+                                if (count($parts) >= 3) {
+                                    $column = end($parts);
+                                    createIndexIfNotExists($pdo, $index, $table, $column);
+                                }
                             } catch (Exception $e) {
                                 // Índice já existe, ignorar
                             }
@@ -222,8 +252,8 @@ class DatabaseMigration {
                         $pdo->exec("ALTER TABLE curriculos ADD COLUMN data_visualizacao TIMESTAMP NULL AFTER visualizado");
 
                         // Criar índices para os novos campos
-                        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_curriculos_status ON curriculos(status)");
-                        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_curriculos_visualizado ON curriculos(visualizado)");
+                        createIndexIfNotExists($pdo, 'idx_curriculos_status', 'curriculos', 'status');
+                        createIndexIfNotExists($pdo, 'idx_curriculos_visualizado', 'curriculos', 'visualizado');
 
                         return "Sistema de status para currículos implementado com sucesso";
                     } catch (Exception $e) {

@@ -5,10 +5,11 @@ if (basename(__FILE__) == basename($_SERVER['SCRIPT_FILENAME'])) {
 }
 
 // Configurações do Banco de Dados (substitua com suas credenciais)
+// Configurações do Banco de Dados (substitua com suas credenciais)
 define('DB_HOST', 'localhost');
-define('DB_USER', 'root');      // Usuário padrão do XAMPP
-define('DB_PASS', '');          // Senha padrão do XAMPP é vazia
-define('DB_NAME', 'gor_informatica'); // Nome do banco de dados que vamos criar
+define('DB_USER', 'gorinf79_curriculosgor');      // Usuário padrão do XAMPP
+define('DB_PASS', 'Gor103Dmas@');          // Senha padrão do XAMPP é vazia
+define('DB_NAME', 'gorinf79_curriculos2'); // Nome do banco de dados que vamos criar
 
 // String de Conexão (DSN)
 $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
