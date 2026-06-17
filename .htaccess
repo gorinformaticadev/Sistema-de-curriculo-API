@@ -1,5 +1,5 @@
 # ========================================
-# PROTEÇÃO DO SISTEMA DE CURRÍCULOS
+# PROTEÇÃO DO SISTEMA DE CURRÍCULOS v3.0
 # GOR INFORMÁTICA
 # ========================================
 
@@ -7,26 +7,37 @@
 Options -Indexes
 
 # ========================================
-# PROTEÇÃO DE ARQUIVOS SENSÍVEIS
+# BLOQUEAR ACESSO A ARQUIVOS SENSÍVEIS
 # ========================================
 
-# Bloquear acesso a arquivos de log
-<FilesMatch "\.(log)$">
+# Arquivo de ambiente (.env)
+<FilesMatch "^\.env">
     Order Allow,Deny
     Deny from all
 </FilesMatch>
 
-# Bloquear acesso a arquivos SQL
+# Arquivos de log
+<FilesMatch "\.(log|bak)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Arquivos SQL e backups
 <FilesMatch "\.(sql)$">
     Order Allow,Deny
     Deny from all
 </FilesMatch>
 
-# Bloquear acesso a arquivos de backup
-<FilesMatch "\.(bak|backup|old)$">
+# Arquivos de configuração e sistema
+<FilesMatch "^(db_connect|install|config)\.php$">
     Order Allow,Deny
     Deny from all
 </FilesMatch>
+
+# Bloquear acesso a diretórios internos
+RedirectMatch 403 ^/includes/.*$
+RedirectMatch 403 ^/config/.*$
+RedirectMatch 403 ^/api/.*$
 
 # Proteger arquivos Git
 <FilesMatch "^\.git">
@@ -34,8 +45,14 @@ Options -Indexes
     Deny from all
 </FilesMatch>
 
+# Proteger install.lock
+<FilesMatch "^install\.lock$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
 # ========================================
-# HEADERS DE SEGURANÇA (OPCIONAL)
+# HEADERS DE SEGURANÇA
 # ========================================
 
 <IfModule mod_headers.c>
@@ -47,12 +64,29 @@ Options -Indexes
     
     # Habilitar proteção XSS do navegador
     Header set X-XSS-Protection "1; mode=block"
+    
+    # Remover header de versão do PHP
+    Header unset X-Powered-By
 </IfModule>
 
 # ========================================
-# COMPRESSÃO GZIP (OPCIONAL)
+# COMPRESSÃO GZIP
 # ========================================
 
 <IfModule mod_deflate.c>
-    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+
+# ========================================
+# CACHE DE ARQUIVOS ESTÁTICOS
+# ========================================
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType text/javascript "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
 </IfModule>
