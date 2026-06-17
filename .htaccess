@@ -29,7 +29,7 @@ Options -Indexes
 </FilesMatch>
 
 # Arquivos de configuração e sistema
-<FilesMatch "^(db_connect|install|config)\.php$">
+<FilesMatch "^(db_connect|config)\.php$">
     Order Allow,Deny
     Deny from all
 </FilesMatch>

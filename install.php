@@ -445,32 +445,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $steps[] = "ℹ️ Configurações padrão já existem.";
             }
 
-            // Atualizar arquivo de conexão se existir e for gravável
-            $dbConnectPath = __DIR__ . '/db_connect.php';
-            if (file_exists($dbConnectPath) && is_writable($dbConnectPath)) {
-                $dbConnectContent = file_get_contents($dbConnectPath);
-                $updated = false;
+            // Criar arquivo .env com as credenciais informadas (apenas em instalação)
+            if ($installMode === 'install') {
+                $envPath = __DIR__ . '/.env';
+                $envExamplePath = __DIR__ . '/.env.example';
 
-                // Substituir configurações mantendo outras linhas intactas
-                $patterns = [
-                    "/define\('DB_USER',\s*'[^']*'\);/" => "define('DB_USER', '" . addslashes($dbUser) . "');",
-                    "/define\('DB_PASS',\s*'[^']*'\);/" => "define('DB_PASS', '" . addslashes($dbPass) . "');",
-                    "/define\('DB_NAME',\s*'[^']*'\);/" => "define('DB_NAME', '" . addslashes($dbName) . "');"
-                ];
+                if (file_exists($envExamplePath)) {
+                    $envContent = file_get_contents($envExamplePath);
 
-                foreach ($patterns as $pattern => $replacement) {
-                    if (preg_match($pattern, $dbConnectContent)) {
-                        $dbConnectContent = preg_replace($pattern, $replacement, $dbConnectContent);
-                        $updated = true;
+                    // Função auxiliar para escapar valor para .env
+                    $escapeEnv = function($val) {
+                        if (strpbrk($val, " #\"'\\") !== false) {
+                            return '"' . str_replace(['"', '\\'], ['\"', '\\\\'], $val) . '"';
+                        }
+                        return $val;
+                    };
+
+                    $envContent = preg_replace('/^DB_HOST=.*$/m', 'DB_HOST=localhost', $envContent);
+                    $envContent = preg_replace('/^DB_USER=.*$/m', 'DB_USER=' . $escapeEnv($dbUser), $envContent);
+                    $envContent = preg_replace('/^DB_PASS=.*$/m', 'DB_PASS=' . $escapeEnv($dbPass), $envContent);
+                    $envContent = preg_replace('/^DB_NAME=.*$/m', 'DB_NAME=' . $escapeEnv($dbName), $envContent);
+
+                    if (file_put_contents($envPath, $envContent)) {
+                        $steps[] = "🔧 Arquivo .env criado com as configurações do banco.";
+                    } else {
+                        $steps[] = "⚠️ Não foi possível criar o arquivo .env.";
                     }
-                }
-
-                if ($updated) {
-                    file_put_contents($dbConnectPath, $dbConnectContent);
-                    $steps[] = "🔧 Arquivo db_connect.php atualizado com as novas configurações.";
+                } else {
+                    $steps[] = "⚠️ Arquivo .env.example não encontrado. Crie o .env manualmente.";
                 }
             } else {
-                $steps[] = "⚠️ Arquivo db_connect.php não encontrado ou sem permissão de escrita.";
+                $steps[] = "ℹ️ Modo atualização: arquivo .env mantido.";
             }
 
             // Informações sobre o sistema atualizado
