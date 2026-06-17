@@ -1,14 +1,8 @@
-# Proibir execução de scripts PHP
-<FilesMatch "\.(php|php5|phtml|pl|py|jsp|asp|htm|html|shtml|sh|cgi)$">
+# Proteção do diretório de uploads
+Options -Indexes
+
+# Bloquear scripts PHP
+<FilesMatch "\.(php|php3|php4|php5|phtml)$">
     Order Allow,Deny
     Deny from all
 </FilesMatch>
-
-# Permitir apenas acesso a arquivos estáticos seguros
-<FilesMatch "\.(jpg|jpeg|png|gif|pdf)$">
-    Order Deny,Allow
-    Allow from all
-</FilesMatch>
-
-# Desabilitar listagem de diretório
-Options -Indexes

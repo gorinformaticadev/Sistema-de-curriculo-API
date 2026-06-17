@@ -1,0 +1,23 @@
+# Versão SIMPLIFICADA do .htaccess
+# Use este arquivo se o .htaccess principal causar erro 500
+# Renomeie para .htaccess (faça backup do original primeiro)
+
+# Desabilitar listagem de diretórios
+Options -Indexes
+
+# Bloquear arquivos de log
+<Files "error.log">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+<Files "access.log">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+# Bloquear arquivos SQL
+<Files "*.sql">
+    Order Allow,Deny
+    Deny from all
+</Files>

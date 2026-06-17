@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solução Erro 500 - .htaccess</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .alert {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .alert-danger {
+            background: #fee2e2;
+            border-left: 4px solid #ef4444;
+            color: #991b1b;
+        }
+        
+        .alert-warning {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            color: #92400e;
+        }
+        
+        .alert-success {
+            background: #d1fae5;
+            border-left: 4px solid #10b981;
+            color: #065f46;
+        }
+        
+        .alert-info {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            color: #1e40af;
+        }
+        
+        .step {
+            background: #f8fafc;
+            border-left: 4px solid #3b82f6;
+            padding: 25px;
+            margin-bottom: 25px;
+            border-radius: 8px;
+        }
+        
+        .step h3 {
+            color: #1f2937;
+            margin-bottom: 15px;
+        }
+        
+        .step p {
+            color: #6b7280;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        
+        code {
+            background: #1f2937;
+            color: #10b981;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .code-block {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            overflow-x: auto;
+            white-space: pre;
+        }
+        
+        ol, ul {
+            margin: 15px 0;
+            padding-left: 30px;
+            color: #6b7280;
+            line-height: 2;
+        }
+        
+        h2 {
+            color: #1f2937;
+            margin: 30px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h1>Solução para Erro 500</h1>
+            <p>Problema com arquivo .htaccess</p>
+        </div>
+        
+        <div class="content">
+            <div class="alert alert-danger">
+                <strong><i class="fas fa-times-circle"></i> Erro 500 - Erro Interno do Servidor</strong><br>
+                Este erro geralmente é causado por um problema no arquivo <code>.htaccess</code>
+            </div>
+            
+            <h2><i class="fas fa-question-circle"></i> O que causa o erro?</h2>
+            
+            <p style="color: #6b7280; line-height: 1.8; margin-bottom: 20px;">
+                O erro 500 pode ser causado por:
+            </p>
+            
+            <ul>
+                <li>Diretivas não suportadas pelo seu servidor Apache</li>
+                <li>Módulos do Apache não habilitados (mod_rewrite, mod_headers, etc.)</li>
+                <li>Sintaxe incorreta no .htaccess</li>
+                <li>Configurações PHP não permitidas</li>
+                <li>Permissões incorretas de arquivo</li>
+            </ul>
+            
+            <h2><i class="fas fa-tools"></i> Soluções</h2>
+            
+            <div class="step">
+                <h3>Solução 1: Usar versão simplificada do .htaccess</h3>
+                <p>Já criei uma versão simplificada que deve funcionar na maioria dos servidores.</p>
+                <p><strong>Passos:</strong></p>
+                <ol>
+                    <li>Renomeie o arquivo atual: <code>.htaccess</code> → <code>.htaccess.backup</code></li>
+                    <li>Renomeie o arquivo: <code>.htaccess.simple</code> → <code>.htaccess</code></li>
+                    <li>Teste o site novamente</li>
+                </ol>
+            </div>
+            
+            <div class="step">
+                <h3>Solução 2: Remover temporariamente o .htaccess</h3>
+                <p>Para verificar se o problema é realmente o .htaccess:</p>
+                <ol>
+                    <li>Renomeie <code>.htaccess</code> para <code>.htaccess.disabled</code></li>
+                    <li>Teste o site</li>
+                    <li>Se funcionar, o problema está no .htaccess</li>
+                    <li>Use a versão simplificada ou adicione as regras uma por vez</li>
+                </ol>
+            </div>
+            
+            <div class="step">
+                <h3>Solução 3: Verificar logs de erro do Apache</h3>
+                <p>Os logs mostram exatamente qual linha está causando o problema.</p>
+                <p><strong>Locais comuns dos logs:</strong></p>
+                <ul>
+                    <li>cPanel: Painel → Logs → Error Log</li>
+                    <li>XAMPP: <code>xampp/apache/logs/error.log</code></li>
+                    <li>Linux: <code>/var/log/apache2/error.log</code></li>
+                </ul>
+            </div>
+            
+            <div class="step">
+                <h3>Solução 4: Verificar módulos do Apache</h3>
+                <p>Alguns módulos podem não estar habilitados no seu servidor.</p>
+                <p><strong>Módulos necessários:</strong></p>
+                <ul>
+                    <li><code>mod_rewrite</code> - Para regras de reescrita</li>
+                    <li><code>mod_headers</code> - Para headers de segurança</li>
+                    <li><code>mod_deflate</code> - Para compressão GZIP</li>
+                    <li><code>mod_expires</code> - Para cache</li>
+                </ul>
+                
+                <p><strong>Como habilitar (se tiver acesso SSH):</strong></p>
+                <div class="code-block">sudo a2enmod rewrite
+sudo a2enmod headers
+sudo systemctl restart apache2</div>
+            </div>
+            
+            <div class="step">
+                <h3>Solução 5: Remover configurações PHP</h3>
+                <p>Algumas hospedagens não permitem alterar configurações PHP via .htaccess.</p>
+                <p><strong>Remova estas linhas se causarem erro:</strong></p>
+                <div class="code-block">php_value upload_max_filesize 10M
+php_value post_max_size 10M
+php_flag engine off</div>
+                <p>Use <code>php.ini</code> ou <code>.user.ini</code> ao invés disso.</p>
+            </div>
+            
+            <h2><i class="fas fa-file-code"></i> Versão Mínima do .htaccess</h2>
+            
+            <div class="alert alert-info">
+                <strong><i class="fas fa-info-circle"></i> Use esta versão se todas as outras falharem:</strong>
+            </div>
+            
+            <div class="code-block"># Versão MÍNIMA - Apenas proteções essenciais
+Options -Indexes
+
+# Bloquear logs
+&lt;Files "error.log"&gt;
+    Order Allow,Deny
+    Deny from all
+&lt;/Files&gt;
+
+&lt;Files "access.log"&gt;
+    Order Allow,Deny
+    Deny from all
+&lt;/Files&gt;</div>
+            
+            <h2><i class="fas fa-clipboard-check"></i> Checklist de Verificação</h2>
+            
+            <div class="alert alert-warning">
+                <strong>Antes de aplicar qualquer solução:</strong>
+                <ol style="margin-top: 10px;">
+                    <li>☐ Faça backup do .htaccess atual</li>
+                    <li>☐ Verifique os logs de erro do Apache</li>
+                    <li>☐ Teste com a versão simplificada primeiro</li>
+                    <li>☐ Adicione regras uma por vez se necessário</li>
+                    <li>☐ Verifique permissões (644 para .htaccess)</li>
+                </ol>
+            </div>
+            
+            <h2><i class="fas fa-terminal"></i> Comandos Úteis (SSH)</h2>
+            
+            <div class="code-block"># Ver últimas linhas do log de erro
+tail -n 50 /var/log/apache2/error.log
+
+# Verificar sintaxe do Apache
+apachectl configtest
+
+# Verificar módulos habilitados
+apache2ctl -M
+
+# Corrigir permissões
+chmod 644 .htaccess</div>
+            
+            <h2><i class="fas fa-phone"></i> Suporte da Hospedagem</h2>
+            
+            <div class="alert alert-info">
+                <strong>Se nada funcionar:</strong><br>
+                Entre em contato com o suporte da sua hospedagem e informe:
+                <ul style="margin-top: 10px;">
+                    <li>Erro 500 ao acessar o site</li>
+                    <li>Problema relacionado ao arquivo .htaccess</li>
+                    <li>Peça para verificar os logs de erro do Apache</li>
+                    <li>Pergunte quais módulos estão habilitados</li>
+                    <li>Pergunte se há restrições para .htaccess</li>
+                </ul>
+            </div>
+            
+            <h2><i class="fas fa-lightbulb"></i> Dicas Importantes</h2>
+            
+            <ul>
+                <li><strong>Sempre faça backup</strong> antes de modificar o .htaccess</li>
+                <li><strong>Teste em ambiente de desenvolvimento</strong> primeiro</li>
+                <li><strong>Adicione regras gradualmente</strong> para identificar problemas</li>
+                <li><strong>Verifique a documentação</strong> da sua hospedagem</li>
+                <li><strong>Use a versão simplificada</strong> se tiver dúvidas</li>
+            </ul>
+            
+            <div class="alert alert-success" style="margin-top: 30px;">
+                <strong><i class="fas fa-check-circle"></i> Versão Simplificada Aplicada!</strong><br>
+                O arquivo .htaccess foi atualizado com uma versão mais compatível que deve funcionar na maioria dos servidores.
+                Se o erro persistir, use as soluções acima.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

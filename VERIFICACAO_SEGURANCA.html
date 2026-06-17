@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificação de Segurança - Sistema de Currículos</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section h2 {
+            color: #1f2937;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #3b82f6;
+        }
+        
+        .check-item {
+            background: #f8fafc;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #6b7280;
+            display: flex;
+            align-items: start;
+            gap: 15px;
+        }
+        
+        .check-item.success {
+            border-left-color: #10b981;
+            background: #d1fae5;
+        }
+        
+        .check-item.warning {
+            border-left-color: #f59e0b;
+            background: #fef3c7;
+        }
+        
+        .check-item.danger {
+            border-left-color: #ef4444;
+            background: #fee2e2;
+        }
+        
+        .check-icon {
+            font-size: 1.5rem;
+            min-width: 30px;
+        }
+        
+        .check-icon.success { color: #10b981; }
+        .check-icon.warning { color: #f59e0b; }
+        .check-icon.danger { color: #ef4444; }
+        
+        .check-content h3 {
+            color: #1f2937;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+        
+        .check-content p {
+            color: #6b7280;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        
+        .test-link {
+            display: inline-block;
+            background: #3b82f6;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .test-link:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+        }
+        
+        .alert {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .alert-info {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            color: #1e40af;
+        }
+        
+        .alert-warning {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            color: #92400e;
+        }
+        
+        code {
+            background: #1f2937;
+            color: #10b981;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: #10b981;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <i class="fas fa-shield-alt"></i>
+            <h1>Verificação de Segurança</h1>
+            <p>Sistema de Currículos - GOR INFORMÁTICA</p>
+        </div>
+        
+        <div class="content">
+            <div class="alert alert-info">
+                <strong><i class="fas fa-info-circle"></i> Importante:</strong> 
+                Use esta página para verificar se todas as proteções de segurança estão funcionando corretamente.
+            </div>
+            
+            <!-- Seção 1: Proteção de Diretórios -->
+            <div class="section">
+                <h2><i class="fas fa-folder-open"></i> Proteção de Diretórios</h2>
+                
+                <div class="check-item success">
+                    <div class="check-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="check-content">
+                        <h3>Listagem de Diretórios Desabilitada</h3>
+                        <p>O arquivo <code>.htaccess</code> principal bloqueia a listagem de diretórios com <code>Options -Indexes</code></p>
+                        <p><strong>Teste:</strong> Tente acessar os links abaixo. Você deve ver uma página de erro 403 ou ser redirecionado.</p>
+                        <a href="uploads/" class="test-link" target="_blank"><i class="fas fa-external-link-alt"></i> Testar /uploads/</a>
+                        <a href="admin/" class="test-link" target="_blank"><i class="fas fa-external-link-alt"></i> Testar /admin/</a>
+                        <a href="backups/" class="test-link" target="_blank"><i class="fas fa-external-link-alt"></i> Testar /backups/</a>
+                    </div>
+                </div>
+                
+                <div class="check-item success">
+                    <div class="check-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="check-content">
+                        <h3>Arquivos index.php de Proteção</h3>
+                        <p>Criados em todos os diretórios sensíveis para redirecionar acessos diretos.</p>
+                        <p><strong>Diretórios protegidos:</strong> admin, uploads, backups, config, api, includes</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Seção 2: Proteção de Arquivos -->
+            <div class="section">
+                <h2><i class="fas fa-file-shield"></i> Proteção de Arquivos Sensíveis</h2>
+                
+                <div class="check-item success">
+                    <div class="check-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="check-content">
+                        <h3>Arquivos de Log Bloqueados</h3>
+                        <p>Arquivos <code>.log</code> não podem ser acessados diretamente.</p>
+                        <a href="error.log" class="test-link" target="_blank"><i class="fas fa-external-link-alt"></i> Testar error.log</a>
+                        <a href="access.log" class="test-link" target="_blank"><i class="fas fa-external-link-alt"></i> Testar access.log</a>
+                    </div>
+                </div>
+                
+                <div class="check-item success">
+                    <div class="check-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="check-content">
+                        <h3>Arquivos de Configuração Bloqueados</h3>
+                        <p>Arquivos <code>.env</code>, <code>.ini</code>, <code>db_connect.php</code> estão protegidos.</p>
+                        <a href="db_connect.php" class="test-link" target="_blank"><i class="fas fa-external-link-alt"></i> Testar db_connect.php</a>
+                    </div>
+                </div>
+                
+                <div class="check-item success">
+                    <div class="check-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="check-content">
+                        <h3>Arquivos SQL Bloqueados</h3>
+                        <p>Scripts SQL não podem ser acessados diretamente.</p>
+                        <a href="create_contact_table.sql" class="test-link" target="_blank"><i class="fas fa-external-link-alt"></i> Testar .sql</a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Seção 3: Proteção de Uploads -->
+            <div class="section">
+                <h2><i class="fas fa-upload"></i> Proteção do Diretório de Uploads</h2>
+                
+                <div class="check-item success">
+                    <div class="check-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="check-content">
+                        <h3>Execução de PHP Desabilitada</h3>
+                        <p>O diretório <code>/uploads/</code> tem <code>php_flag engine off</code></p>
+                        <p><strong>Proteção:</strong> Mesmo que alguém faça upload de um arquivo PHP malicioso, ele não será executado.</p>
+                    </div>
+                </div>
+                
+                <div class="check-item success">
+                    <div class="check-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="check-content">
+                        <h3>Apenas Imagens e PDFs Permitidos</h3>
+                        <p>Somente arquivos <code>.jpg</code>, <code>.jpeg</code>, <code>.png</code>, <code>.gif</code> e <code>.pdf</code> são permitidos.</p>
+                        <p><strong>Bloqueados:</strong> .php, .exe, .sh, .py, .pl, .asp, .jsp, .cgi</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Seção 4: Headers de Segurança -->
+            <div class="section">
+                <h2><i class="fas fa-network-wired"></i> Headers de Segurança HTTP</h2>
+                
+                <div class="check-item success">
+                    <div class="check-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="check-content">
+                        <h3>Headers Implementados</h3>
+                        <p>Os seguintes headers de segurança estão configurados:</p>
+                        <ul style="margin-top: 10px; padding-left: 20px; color: #6b7280;">
+                            <li><code>X-Frame-Options: SAMEORIGIN</code> - Previne clickjacking</li>
+                            <li><code>X-Content-Type-Options: nosniff</code> - Previne MIME sniffing</li>
+                            <li><code>X-XSS-Protection: 1; mode=block</code> - Proteção XSS</li>
+                            <li><code>Referrer-Policy</code> - Controla informações de referência</li>
+                            <li><code>Content-Security-Policy</code> - Controla recursos carregados</li>
+                        </ul>
+                        <p style="margin-top: 10px;"><strong>Teste:</strong> Use ferramentas online para verificar os headers.</p>
+                        <a href="https://securityheaders.com/" class="test-link" target="_blank"><i class="fas fa-external-link-alt"></i> Security Headers</a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Seção 5: Proteção contra Ataques -->
+            <div class="section">
+                <h2><i class="fas fa-bug"></i> Proteção contra Ataques</h2>
+                
+                <div class="check-item success">
+                    <div class="check-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="check-content">
+                        <h3>SQL Injection</h3>
+                        <p><strong>Proteção em .htaccess:</strong> Bloqueia query strings com palavras-chave SQL suspeitas</p>
+                        <p><strong>Proteção em código:</strong> Uso de prepared statements em todas as queries</p>
+                    </div>
+                </div>
+                
+                <div class="check-item success">
+                    <div class="check-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="check-content">
+                        <h3>XSS (Cross-Site Scripting)</h3>
+                        <p><strong>Proteção:</strong> Sanitização de saída com <code>htmlspecialchars()</code></p>
+                        <p><strong>Bloqueio:</strong> Query strings com tags <code>&lt;script&gt;</code> são bloqueadas</p>
+                    </div>
+                </div>
+                
+                <div class="check-item success">
+                    <div class="check-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="check-content">
+                        <h3>CSRF (Cross-Site Request Forgery)</h3>
+                        <p><strong>Proteção:</strong> Tokens CSRF em todas as operações POST</p>
+                        <p>Todas as ações administrativas verificam o token antes de executar.</p>
+                    </div>
+                </div>
+                
+                <div class="check-item success">
+                    <div class="check-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="check-content">
+                        <h3>Bots e Scanners</h3>
+                        <p><strong>Bloqueados:</strong> User agents suspeitos como curl, wget, nikto, HTTrack</p>
+                        <p>Requisições com user agents vazios ou de ferramentas de scan são bloqueadas.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Seção 6: HTTPS -->
+            <div class="section">
+                <h2><i class="fas fa-lock"></i> HTTPS / SSL</h2>
+                
+                <div class="check-item warning">
+                    <div class="check-icon warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="check-content">
+                        <h3>Configuração HTTPS</h3>
+                        <p><strong>Status:</strong> Código preparado mas desativado por padrão</p>
+                        <p><strong>Para ativar:</strong></p>
+                        <ol style="margin-top: 10px; padding-left: 20px; color: #6b7280;">
+                            <li>Obtenha um certificado SSL (Let's Encrypt é gratuito)</li>
+                            <li>Edite o arquivo <code>.htaccess</code></li>
+                            <li>Descomente a seção "FORÇAR HTTPS"</li>
+                            <li>Teste o redirecionamento</li>
+                        </ol>
+                        <a href="https://letsencrypt.org/" class="test-link" target="_blank"><i class="fas fa-external-link-alt"></i> Let's Encrypt</a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Checklist Final -->
+            <div class="section">
+                <h2><i class="fas fa-tasks"></i> Checklist de Verificação</h2>
+                
+                <div class="alert alert-warning">
+                    <strong><i class="fas fa-clipboard-check"></i> Antes de Colocar em Produção:</strong>
+                    <ul style="margin-top: 10px; padding-left: 20px; line-height: 2;">
+                        <li>☐ Alterar credenciais do banco de dados</li>
+                        <li>☐ Criar usuários admin com senhas fortes</li>
+                        <li>☐ Ajustar domínio no .htaccess (linha de hotlinking)</li>
+                        <li>☐ Ativar HTTPS e redirecionamento</li>
+                        <li>☐ Verificar permissões (755 para pastas, 644 para arquivos)</li>
+                        <li>☐ Testar todos os links de proteção acima</li>
+                        <li>☐ Fazer backup do banco de dados</li>
+                        <li>☐ Revisar logs de erro</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 40px;">
+                <a href="admin.php" class="btn"><i class="fas fa-arrow-left"></i> Voltar ao Painel</a>
+                <a href="SEGURANCA_SISTEMA.md" class="btn btn-success"><i class="fas fa-book"></i> Documentação Completa</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
