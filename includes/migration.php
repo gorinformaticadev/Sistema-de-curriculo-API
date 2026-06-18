@@ -285,6 +285,18 @@ class DatabaseMigration {
 
                     return "Sistema de mensagens WhatsApp implementado com sucesso";
                 }
+            ],
+            '2.3.0' => [
+                'description' => 'Adicionar campo Possui Filhos aos currículos',
+                'script' => function($pdo) {
+                    try {
+                        $pdo->exec("ALTER TABLE curriculos ADD COLUMN possui_filhos TINYINT(1) DEFAULT 0 AFTER estado_civil");
+                        return "Coluna 'possui_filhos' adicionada com sucesso";
+                    } catch (Exception $e) {
+                        // Coluna já existe, ignorar
+                        return "Coluna 'possui_filhos' já existia";
+                    }
+                }
             ]
         ];
     }

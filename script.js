@@ -497,15 +497,66 @@ function handleCurriculumSubmit(e) {
         return response.text().then(text => {
             console.log('📄 Resposta bruta:', text);
             
+            // 1. Tentar parsear diretamente
             try {
                 return JSON.parse(text);
             } catch (e) {
-                console.error('❌ Erro ao parsear JSON:', e);
-                console.error('📄 Conteúdo recebido:', text);
-                // Mostrar os primeiros 300 caracteres da resposta para ajudar no diagnóstico
-                const preview = text.substring(0, 300);
-                throw new Error('Resposta inválida do servidor (HTML ou erro PHP detectado).\n\nInício da resposta:\n' + preview);
+                console.warn('⚠️ JSON.parse direto falhou, tentando alternativas...');
+                console.log('📄 Conteúdo completo:', text);
             }
+            
+            // 2. Tentar com trim (pode haver espaços/BOM antes ou depois)
+            try {
+                return JSON.parse(text.trim());
+            } catch (e) {
+                // continuar
+            }
+            
+            // 3. Extrair JSON válido contando chaves (ignora lixo depois do JSON)
+            const firstBrace = text.indexOf('{');
+            if (firstBrace !== -1) {
+                let depth = 0;
+                let inString = false;
+                let escape = false;
+                for (let i = firstBrace; i < text.length; i++) {
+                    const ch = text[i];
+                    if (escape) { escape = false; continue; }
+                    if (ch === '\\') { escape = true; continue; }
+                    if (ch === '"') { inString = !inString; continue; }
+                    if (inString) continue;
+                    if (ch === '{') depth++;
+                    if (ch === '}') depth--;
+                    if (depth === 0) {
+                        const jsonStr = text.substring(firstBrace, i + 1);
+                        try {
+                            const parsed = JSON.parse(jsonStr);
+                            console.log('✅ JSON extraído por contagem de chaves:', parsed);
+                            return parsed;
+                        } catch (e) {
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // 4. Último recurso: detectar success/fail pelo texto bruto
+            const isSuccess = text.includes('"success":true') || text.includes('"success": true');
+            const isFailure = text.includes('"success":false') || text.includes('"success": false');
+            
+            if (isSuccess) {
+                console.log('✅ Sucesso detectado pelo texto bruto');
+                return { success: true, message: 'Currículo cadastrado com sucesso!' };
+            }
+            if (isFailure) {
+                // Extrair a mensagem de erro do texto
+                const msgMatch = text.match(/"message"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+                const msg = msgMatch ? msgMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n') : 'Erro desconhecido no servidor.';
+                console.log('❌ Falha detectada pelo texto bruto:', msg);
+                return { success: false, message: msg };
+            }
+            
+            const preview = text.substring(0, 300);
+            throw new Error('Resposta inválida do servidor.\n\nInício da resposta:\n' + preview);
         });
     })
     .then(data => {

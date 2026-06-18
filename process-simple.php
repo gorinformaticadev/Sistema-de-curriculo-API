@@ -1,4 +1,4 @@
-﻿﻿<?php
+﻿﻿﻿﻿<?php
 // Buffer de saída para evitar que HTML/warnings corrompam a resposta JSON
 ob_start();
 
@@ -28,9 +28,9 @@ function logError($message, $type = 'ERROR') {
 
 // Função para enviar JSON de forma segura (limpa buffer antes)
 function sendJson($data, $httpCode = 200) {
-    // Limpar qualquer conteúdo no buffer (warnings, notices, BOM, etc)
-    if (ob_get_length()) {
-        ob_clean();
+    // Limpar TODOS os níveis de buffer para evitar conteúdo extra após o JSON
+    while (ob_get_level()) {
+        ob_end_clean();
     }
     http_response_code($httpCode);
     header('Content-Type: application/json; charset=utf-8');
@@ -146,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Sanitizar e coletar dados do POST
         $formData = [];
-        $fields = ['name', 'birthDate', 'maritalStatus', 'email', 'facebook', 'instagram', 'address', 'city', 'state', 'education', 'isStudying', 'studyPeriod', 'hasCourses', 'courses', 'hasExperience', 'motivation', 'acceptTerms', 'workSchedule'];
+        $fields = ['name', 'birthDate', 'maritalStatus', 'hasChildren', 'email', 'facebook', 'instagram', 'address', 'city', 'state', 'education', 'isStudying', 'studyPeriod', 'hasCourses', 'courses', 'hasExperience', 'motivation', 'acceptTerms', 'workSchedule'];
         foreach ($fields as $field) {
             $formData[$field] = sanitizeInput($_POST[$field] ?? '');
         }
@@ -221,14 +221,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Inserir no banco de dados
-        $sql = "INSERT INTO curriculos (nome, data_nascimento, estado_civil, telefone, is_whatsapp, email, facebook, instagram, endereco, cidade, estado, escolaridade, estudando, periodo_estudo, possui_cursos, cursos, possui_experiencia, experiencias, motivacao, arquivo_curriculo, arquivo_foto, ip_cadastro) 
-                VALUES (:nome, :data_nascimento, :estado_civil, :telefone, :is_whatsapp, :email, :facebook, :instagram, :endereco, :cidade, :estado, :escolaridade, :estudando, :periodo_estudo, :possui_cursos, :cursos, :possui_experiencia, :experiencias, :motivacao, :arquivo_curriculo, :arquivo_foto, :ip_cadastro)";
+        $sql = "INSERT INTO curriculos (nome, data_nascimento, estado_civil, possui_filhos, telefone, is_whatsapp, email, facebook, instagram, endereco, cidade, estado, escolaridade, estudando, periodo_estudo, possui_cursos, cursos, possui_experiencia, experiencias, motivacao, arquivo_curriculo, arquivo_foto, ip_cadastro) 
+                VALUES (:nome, :data_nascimento, :estado_civil, :possui_filhos, :telefone, :is_whatsapp, :email, :facebook, :instagram, :endereco, :cidade, :estado, :escolaridade, :estudando, :periodo_estudo, :possui_cursos, :cursos, :possui_experiencia, :experiencias, :motivacao, :arquivo_curriculo, :arquivo_foto, :ip_cadastro)";
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             ':nome' => $formData['name'],
             ':data_nascimento' => $formData['birthDate'],
             ':estado_civil' => $formData['maritalStatus'],
+            ':possui_filhos' => ($formData['hasChildren'] === 'Sim') ? 1 : 0,
             ':telefone' => $formData['phone'], // concatenated phones
             ':is_whatsapp' => $isWhatsapp_db,
             ':email' => $formData['email'],
@@ -276,7 +277,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $textMessage .= "*--- Dados Pessoais ---*\n";
             $textMessage .= "*Nome:* " . ($formData['name'] ?? 'N/A') . "\n";
             $textMessage .= "*Data de Nasc.:* " . ($formData['birthDate'] ? date('d/m/Y', strtotime($formData['birthDate'])) : 'N/A') . "\n";
-            $textMessage .= "*Estado Civil:* " . ($formData['maritalStatus'] ?? 'N/A') . "\n\n";
+            $textMessage .= "*Estado Civil:* " . ($formData['maritalStatus'] ?? 'N/A') . "\n";
+            $textMessage .= "*Possui Filhos?:* " . ($formData['hasChildren'] ?? 'N/A') . "\n\n";
 
             $textMessage .= "*--- Contato ---*\n";
             foreach ($phones as $index => $phone) {
