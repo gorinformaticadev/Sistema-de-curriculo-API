@@ -52,6 +52,7 @@ function apiGetCurriculoDetails($pdo) {
             
             // Converter valores booleanos de volta para texto para exibição
             $curriculo['is_whatsapp'] = $curriculo['is_whatsapp'] ? 'Sim' : 'Não';
+            $curriculo['possui_filhos'] = $curriculo['possui_filhos'] ? 'Sim' : 'Não';
             $curriculo['estudando'] = $curriculo['estudando'] ? 'Sim, estou!' : 'Não, não estou!';
             $curriculo['possui_cursos'] = $curriculo['possui_cursos'] ? 'Sim' : 'Não';
             $curriculo['possui_experiencia'] = $curriculo['possui_experiencia'] ? 'Sim' : 'Não';
@@ -228,6 +229,8 @@ function apiExportCurriculos($pdo) {
                 'Telefone' => $curriculo['telefone'],
                 'Cidade' => $curriculo['cidade'],
                 'Estado' => $curriculo['estado'],
+                'Estado_Civil' => $curriculo['estado_civil'],
+                'Possui_Filhos' => $curriculo['possui_filhos'] ? 'Sim' : 'Não',
                 'Escolaridade' => $curriculo['escolaridade'],
                 'Data_Cadastro' => formatDate($curriculo['data_cadastro']),
                 'IP_Cadastro' => $curriculo['ip_cadastro']

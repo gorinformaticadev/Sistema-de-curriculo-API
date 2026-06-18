@@ -250,6 +250,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'getCurriculoDetails' && isset
         }
         // Converter valores booleanos de volta para texto para exibição
         $curriculo['is_whatsapp'] = $curriculo['is_whatsapp'] ? 'Sim' : 'Não';
+        $curriculo['possui_filhos'] = $curriculo['possui_filhos'] ? 'Sim' : 'Não';
         $curriculo['estudando'] = $curriculo['estudando'] ? 'Sim, estou!' : 'Não, não estou!';
         $curriculo['possui_cursos'] = $curriculo['possui_cursos'] ? 'Sim' : 'Não';
         $curriculo['possui_experiencia'] = $curriculo['possui_experiencia'] ? 'Sim' : 'Não';
@@ -2487,6 +2488,7 @@ Equipe de RH</textarea>
                                     <p><strong>Nome:</strong> ${c.nome}</p>
                                     <p><strong>Data de Nascimento:</strong> ${new Date(c.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
                                     <p><strong>Estado Civil:</strong> ${c.estado_civil || 'Não informado'}</p>
+                                    <p><strong>Possui Filhos?:</strong> ${c.possui_filhos || 'Não informado'}</p>
                                     <p><strong>Status:</strong> ${c.status || 'Não definido'}</p>
                                     <p><strong>Visualizado:</strong> ${c.visualizado ? 'Sim' : 'Não'}</p>
                                     ${c.data_visualizacao ? `<p><strong>Data da Visualização:</strong> ${new Date(c.data_visualizacao).toLocaleString('pt-BR')}</p>` : ''}
