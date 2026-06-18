@@ -502,7 +502,9 @@ function handleCurriculumSubmit(e) {
             } catch (e) {
                 console.error('❌ Erro ao parsear JSON:', e);
                 console.error('📄 Conteúdo recebido:', text);
-                throw new Error('Resposta inválida do servidor. O servidor pode estar retornando HTML ao invés de JSON. Verifique se o arquivo process-simple.php existe e está configurado corretamente.');
+                // Mostrar os primeiros 300 caracteres da resposta para ajudar no diagnóstico
+                const preview = text.substring(0, 300);
+                throw new Error('Resposta inválida do servidor (HTML ou erro PHP detectado).\n\nInício da resposta:\n' + preview);
             }
         });
     })

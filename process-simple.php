@@ -1,4 +1,7 @@
-﻿﻿﻿﻿<?php
+﻿﻿<?php
+// Buffer de saída para evitar que HTML/warnings corrompam a resposta JSON
+ob_start();
+
 header('Content-Type: application/json; charset=utf-8');
 
 // Incluir o arquivo de conexão com o banco de dados
@@ -21,6 +24,18 @@ function logError($message, $type = 'ERROR') {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $logMessage = "[$timestamp] [$type] [IP: $ip] $message" . PHP_EOL;
     file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
+}
+
+// Função para enviar JSON de forma segura (limpa buffer antes)
+function sendJson($data, $httpCode = 200) {
+    // Limpar qualquer conteúdo no buffer (warnings, notices, BOM, etc)
+    if (ob_get_length()) {
+        ob_clean();
+    }
+    http_response_code($httpCode);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    exit;
 }
 
 // Carregar configuração do banco de dados
@@ -124,8 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // --- VERIFICACAO HONEYPOT ANTI-SPAM ---
         if (!empty($_POST['website'])) {
             logError('Honeypot triggered - possible bot submission', 'SECURITY');
-            echo json_encode(['success' => true, 'message' => 'Curriculo cadastrado com sucesso!']);
-            exit;
+            sendJson(['success' => true, 'message' => 'Curriculo cadastrado com sucesso!']);
         }
 
         $config = loadConfigFromDB($pdo);
@@ -202,8 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             if ($dupStmt->fetch()) {
                 logError('DUPLICATE_DETECTED: Curriculo ja cadastrado para ' . $formData['name'], 'WARNING');
-                echo json_encode(['success' => false, 'message' => 'Este curriculo ja foi cadastrado anteriormente. Nao e necessario envia-lo novamente.']);
-                exit;
+                sendJson(['success' => false, 'message' => 'Este curriculo ja foi cadastrado anteriormente. Nao e necessario envia-lo novamente.']);
             }
         }
 
@@ -354,15 +367,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             logError("Email remetente ou destinatário não configurado. Notificação por email pulada.", 'WARNING');
         }
 
-        echo json_encode(['success' => true, 'message' => 'Currículo cadastrado com sucesso!']);
+        sendJson(['success' => true, 'message' => 'Currículo cadastrado com sucesso!']);
 
     } catch (Exception $e) {
         logError("ERRO NO PROCESSAMENTO: " . $e->getMessage());
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        sendJson(['success' => false, 'message' => $e->getMessage()], 400);
     }
 } else {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método não permitido']);
+    sendJson(['success' => false, 'message' => 'Método não permitido'], 405);
 }
-?>

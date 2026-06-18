@@ -101,6 +101,7 @@ try {
             }
             logError('AUTO_SETUP_FAILED: Falha na configuração automática: ' . $initError->getMessage());
 
+            if (ob_get_level()) ob_clean();
             http_response_code(500);
             echo json_encode([
                 'success' => false,
@@ -125,6 +126,7 @@ try {
         }
         logError('DB_CONNECT_FAILURE: Falha na conexão com o banco de dados: ' . $e->getMessage());
 
+        if (ob_get_level()) ob_clean();
         http_response_code(500);
         echo json_encode([
             'success' => false,
