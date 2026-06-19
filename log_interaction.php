@@ -1,9 +1,20 @@
 <?php
 /**
  * Endpoint para registrar interações do formulário
+ * Suporta ações: change, select, check, file_selected, form_submitted, form_submit_click, form_access, form_abandoned
  */
 
+// Buffer de saída para evitar que warnings/notices corrompam o JSON
+ob_start();
+
+// Suprimir warnings/notices na saída (loga apenas no error.log)
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Expires: 0');
 
 require_once 'db_connect.php';
 
@@ -95,6 +106,11 @@ try {
         $insertedCount++;
     }
 
+    // Limpar qualquer conteúdo no buffer antes de enviar JSON
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+
     echo json_encode([
         'success' => true,
         'message' => "$insertedCount interações registradas com sucesso",
@@ -102,6 +118,10 @@ try {
     ]);
 
 } catch (Exception $e) {
+    // Limpar buffer antes de enviar erro
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
     http_response_code(400);
     echo json_encode([
         'success' => false,

@@ -25,6 +25,19 @@ function initializeEventListeners() {
         curriculumForm.reset();
         resetFormSections();
         resetDynamicFields();
+        
+        // Resetar o tracker para nova sessão
+        if (window.formTracker) {
+            window.formTracker.formSubmitted = false;
+            window.formTracker.interactions = [];
+            window.formTracker.lastField = null;
+            window.formTracker.userName = null;
+            // Gerar nova sessão
+            sessionStorage.removeItem('form_session_id');
+            window.formTracker.sessionId = window.formTracker.generateSessionId();
+            // Registrar novo acesso
+            window.formTracker.trackFormAccess();
+        }
     });
 
     // Add contact button
@@ -461,10 +474,10 @@ function handleCurriculumSubmit(e) {
     
     console.log('🚀 Enviando dados para process-simple.php...');
     
-    // Determinar o caminho correto do arquivo PHP
+    // Determinar o caminho correto do arquivo PHP com cache-busting
     const phpPath = window.location.pathname.includes('/') 
-        ? window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1) + 'process-simple.php'
-        : 'process-simple.php';
+        ? window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1) + 'process-simple.php?v=' + Date.now()
+        : 'process-simple.php?v=' + Date.now();
     
     console.log('📍 Caminho do PHP:', phpPath);
     
@@ -563,6 +576,13 @@ function handleCurriculumSubmit(e) {
         console.log('✅ Dados processados:', data);
         
         if (data.success) {
+            // Marcar formulário como enviado para o tracker (evita registrar como abandono)
+            if (window.formTracker) {
+                window.formTracker.markFormSubmitted();
+                // Limpar dados de sessão do tracker para novo cadastro
+                sessionStorage.removeItem('form_session_id');
+            }
+
             // Show success message
             document.getElementById('successText').textContent = 
                 `${name}, seu currículo foi cadastrado com sucesso e será analisado pela nossa equipe de RH.`;

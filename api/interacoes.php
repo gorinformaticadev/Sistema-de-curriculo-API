@@ -14,20 +14,42 @@ function apiGetInteractionStats($pdo) {
     }
     
     try {
-        // Total de sessões únicas
-        $stmt = $pdo->query("SELECT COUNT(DISTINCT session_id) as total FROM form_interactions");
+        // Total de sessões únicas (excluir sessões que só têm form_access sem nenhuma outra interação)
+        $stmt = $pdo->query("
+            SELECT COUNT(DISTINCT session_id) as total 
+            FROM form_interactions 
+            WHERE acao NOT IN ('form_access')
+        ");
         $totalSessions = $stmt->fetchColumn();
 
-        // Formulários completos (sessões que têm registro na tabela curriculos)
+        // Se não houver dados filtrados, contar todas as sessões
+        if ($totalSessions == 0) {
+            $stmt = $pdo->query("SELECT COUNT(DISTINCT session_id) as total FROM form_interactions");
+            $totalSessions = $stmt->fetchColumn();
+        }
+
+        // Formulários completos (sessões com ação form_submitted OU com currículo cadastrado)
+        $stmt = $pdo->query("
+            SELECT COUNT(DISTINCT fi.session_id) as total 
+            FROM form_interactions fi
+            WHERE fi.acao IN ('form_submitted', 'form_submit_click')
+        ");
+        $completedByAction = $stmt->fetchColumn();
+
+        // Também verificar por currículo cadastrado na mesma data
         $stmt = $pdo->query("
             SELECT COUNT(DISTINCT fi.session_id) as total 
             FROM form_interactions fi
             INNER JOIN curriculos c ON DATE(fi.timestamp) = DATE(c.data_cadastro)
         ");
-        $completedForms = $stmt->fetchColumn();
+        $completedByCurriculo = $stmt->fetchColumn();
 
-        // Abandonos
+        // Usar o maior valor entre as duas métricas
+        $completedForms = max($completedByAction, $completedByCurriculo);
+
+        // Abandonos (sessões com ação form_abandoned ou sem currículo cadastrado)
         $abandonedForms = $totalSessions - $completedForms;
+        if ($abandonedForms < 0) $abandonedForms = 0;
 
         // Taxa de conversão
         $conversionRate = $totalSessions > 0 ? round(($completedForms / $totalSessions) * 100, 1) : 0;
@@ -167,11 +189,11 @@ function apiGetInteractionSessions($pdo) {
             $stmt->execute([$session['ip'], $session['last_interaction']]);
             $hasCurriculo = $stmt->rowCount() > 0;
 
-            // 2. Verificar se houve clique no botão de finalizar (ação 'form_submitted')
+            // 2. Verificar se houve clique no botão de finalizar (ação 'form_submitted' ou 'form_submit_click')
             $stmt2 = $pdo->prepare("
                 SELECT 1 FROM form_interactions 
                 WHERE session_id = ? 
-                AND acao = 'form_submitted' 
+                AND acao IN ('form_submitted', 'form_submit_click') 
                 LIMIT 1
             ");
             $stmt2->execute([$session['session_id']]);
@@ -211,7 +233,6 @@ function apiGetSessionDetails($pdo) {
                 timestamp
             FROM form_interactions
             WHERE session_id = ?
-            AND acao != 'form_submitted'
             ORDER BY timestamp ASC
         ");
         

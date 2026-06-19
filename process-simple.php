@@ -1,8 +1,11 @@
-﻿﻿﻿﻿<?php
+﻿﻿﻿﻿﻿<?php
 // Buffer de saída para evitar que HTML/warnings corrompam a resposta JSON
 ob_start();
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Expires: 0');
 
 // Incluir o arquivo de conexão com o banco de dados
 require_once 'db_connect.php';

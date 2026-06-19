@@ -2820,7 +2820,11 @@ Equipe de RH</textarea>
                 'change': '✏️ Alterou',
                 'select': '✅ Selecionou',
                 'check': '☑️ Marcou',
-                'file_selected': '📎 Anexou arquivo em'
+                'file_selected': '📎 Anexou arquivo em',
+                'form_access': '🌐 Acessou o formulário',
+                'form_abandoned': '🚪 Abandonou o formulário',
+                'form_submitted': '✅ Finalizou o cadastro',
+                'form_submit_click': '🖱️ Clicou em finalizar'
             };
             
             let html = '<h5 style="margin-top: 0; color: #1f2937;"><i class="fas fa-history"></i> Timeline de Interações</h5>';

@@ -10,6 +10,8 @@ class FormTracker {
         this.userName = null;
         this.interactions = [];
         this.sendInterval = 5000; // Enviar dados a cada 5 segundos
+        this.formSubmitted = false; // Rastrear se o formulário foi enviado com sucesso
+        this.blurListenerAdded = false; // Evitar registrar múltiplos listeners de blur
         this.init();
     }
 
@@ -31,13 +33,16 @@ class FormTracker {
         if (interactionsCookie) {
             try {
                 const interactionsData = JSON.parse(interactionsCookie);
-                this.interactions = interactionsData.interactions;
+                this.interactions = interactionsData.interactions || [];
                 this.lastField = interactionsData.lastField;
                 this.userName = interactionsData.userName;
             } catch (error) {
                 // console.error('❌ Erro ao ler as interações dos cookies:', error);
             }
         }
+
+        // Rastrear acesso ao formulário (registrar no banco de dados)
+        this.trackFormAccess();
 
         // Rastrear todos os inputs, selects e textareas
         this.trackFormFields();
@@ -51,8 +56,17 @@ class FormTracker {
         // Enviar dados periodicamente
         setInterval(() => this.sendInteractions(), this.sendInterval);
 
-        // Enviar dados antes de sair da página
-        window.addEventListener('beforeunload', () => this.sendInteractions(true));
+        // Registrar listener de blur UMA ÚNICA VEZ (não dentro de sendInteractions)
+        if (!this.blurListenerAdded) {
+            this.blurListenerAdded = true;
+            window.addEventListener('blur', () => {
+                sessionStorage.removeItem('form_session_id');
+                // console.log('🔄 Sessão reiniciada devido à perda de foco.');
+            });
+        }
+
+        // Enviar dados antes de sair da página (inclui detecção de abandono)
+        window.addEventListener('beforeunload', () => this.handlePageExit());
     }
 
     // Função para obter um cookie
@@ -65,6 +79,74 @@ class FormTracker {
             if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
         }
         return null;
+    }
+
+    /**
+     * Registra o acesso ao formulário na tabela form_interactions
+     * Isso garante que a aba "Interações do Formulário" no admin tenha dados de acesso
+     */
+    trackFormAccess() {
+        const accessInteraction = {
+            sessionId: this.sessionId,
+            fieldName: 'form_access',
+            fieldLabel: 'Acesso ao Formulário',
+            action: 'form_access',
+            fieldValue: 'Página do formulário acessada',
+            userName: this.userName,
+            timestamp: new Date().toISOString()
+        };
+
+        this.interactions.push(accessInteraction);
+
+        // Enviar imediatamente para garantir registro
+        this.sendInteractions();
+    }
+
+    /**
+     * Marca o formulário como enviado com sucesso
+     * Chamado pelo script.js após resposta de sucesso
+     */
+    markFormSubmitted() {
+        this.formSubmitted = true;
+    }
+
+    /**
+     * Handler de saída da página - detecta abandono e envia interações pendentes
+     */
+    handlePageExit() {
+        // Se o formulário NÃO foi enviado com sucesso, registrar como abandono
+        if (!this.formSubmitted) {
+            const abandonInteraction = {
+                sessionId: this.sessionId,
+                fieldName: 'form_abandoned',
+                fieldLabel: 'Formulário Abandonado',
+                action: 'form_abandoned',
+                fieldValue: this.lastField || 'Nenhum campo preenchido',
+                userName: this.userName,
+                timestamp: new Date().toISOString()
+            };
+            this.interactions.push(abandonInteraction);
+        }
+
+        // Sempre tentar enviar interações pendentes ao sair
+        if (this.interactions.length > 0) {
+            const dataToSend = {
+                interactions: [...this.interactions],
+                lastField: this.lastField,
+                userName: this.userName
+            };
+            this.interactions = [];
+            const blob = new Blob([JSON.stringify(dataToSend)], { type: 'application/json' });
+            navigator.sendBeacon('log_interaction.php', blob);
+        }
+
+        // Salvar estado nos cookies para recuperação
+        const dataToSave = {
+            interactions: [],
+            lastField: this.lastField,
+            userName: this.userName
+        };
+        this.setCookie('formInteractions', JSON.stringify(dataToSave), 30);
     }
 
     trackFormFields() {
@@ -121,11 +203,19 @@ class FormTracker {
             });
         });
 
-        // Rastrear botão de finalizar cadastro
-        const submitBtn = form.querySelector('button[type="submit"]');
+        // Rastrear botão de finalizar cadastro (usar evento 'submit' do form para garantir captura)
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                this.logInteraction(form.querySelector('button[type="submit"]') || e.target, 'form_submitted');
+            });
+        }
+        // Também rastrear click no botão como fallback
+        const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
         if (submitBtn) {
             submitBtn.addEventListener('click', (e) => {
-                this.logInteraction(e.target, 'form_submitted');
+                if (!this.formSubmitted) {
+                    this.logInteraction(e.target, 'form_submit_click');
+                }
             });
         }
     }
@@ -204,6 +294,7 @@ class FormTracker {
             'name': 'Nome Completo',
             'birthDate': 'Data de Nascimento',
             'maritalStatus': 'Estado Civil',
+            'hasChildren': 'Possui Filhos?',
             'phone': 'Telefone',
             'isWhatsapp': 'É WhatsApp?',
             'email': 'Email',
@@ -255,15 +346,13 @@ class FormTracker {
                     body: JSON.stringify(dataToSend)
                 });
 
-                // Reiniciar sessão se a página perder o foco
-                window.addEventListener('blur', function () {
-                    sessionStorage.removeItem('form_session_id');
-                    // console.log('🔄 Sessão reiniciada devido à perda de foco.');
-                });
-
                 if (response.ok) {
-                    const result = await response.json();
-                    // console.log('✅ Interações enviadas:', result);
+                    try {
+                        const result = await response.json();
+                        // console.log('✅ Interações enviadas:', result);
+                    } catch (jsonErr) {
+                        // Resposta não-JSON, ignorar
+                    }
                 } else {
                     // console.error('❌ Erro ao enviar interações:', response.status);
                 }
