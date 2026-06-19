@@ -502,6 +502,9 @@ body {
     padding: 15px 24px;
     font-size: 1.1rem;
     margin-top: 20px;
+    /* Melhora compatibilidade com iOS */
+    -webkit-appearance: none;
+    touch-action: manipulation;
 }
 
 .btn-submit:hover {

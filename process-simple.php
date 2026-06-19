@@ -203,7 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Upload dos arquivos
         $resumeFile = uploadFile($_FILES['resume'], ['pdf'], 'curriculo');
-        $photoFile = uploadFile($_FILES['photo'], ['jpg', 'jpeg', 'png', 'gif'], 'foto');
+        $photoFile = uploadFile($_FILES['photo'], ['jpg', 'jpeg', 'png', 'gif', 'heic', 'heif'], 'foto');
 
         // --- VERIFICACAO DE DUPLICATA (Nome + Data Nascimento + Telefone) ---
         $primeiroTelefone = !empty($phones_clean) ? $phones_clean[0] : '';

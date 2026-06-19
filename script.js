@@ -454,10 +454,10 @@ function handleCurriculumSubmit(e) {
         alert('❌ A foto é muito grande. Tamanho máximo permitido: 15MB.');
         return;
     }
-    const allowedPhotoExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+    const allowedPhotoExtensions = ['jpg', 'jpeg', 'png', 'gif', 'heic', 'heif'];
     const photoExtension = photoFile.name.split('.').pop().toLowerCase();
     if (!allowedPhotoExtensions.includes(photoExtension)) {
-        alert('❌ A foto deve ser um arquivo JPG, JPEG, PNG ou GIF.');
+        alert('❌ A foto deve ser um arquivo JPG, JPEG, PNG, GIF ou HEIC (iPhone).');
         return;
     }
     
