@@ -66,7 +66,25 @@ class FormTracker {
         }
 
         // Enviar dados antes de sair da página (inclui detecção de abandono)
-        window.addEventListener('beforeunload', () => this.handlePageExit());
+        // beforeunload - funciona na maioria dos casos
+        window.addEventListener('beforeunload', () => {
+            console.log('🚪 beforeunload disparado');
+            this.handlePageExit();
+        });
+
+        // pagehide - mais confiável em mobile
+        window.addEventListener('pagehide', (e) => {
+            console.log('🚪 pagehide disparado');
+            this.handlePageExit();
+        });
+
+        // visibilitychange - dispara quando a aba é fechada/oculta
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                console.log('🚪 visibilitychange hidden disparado');
+                this.handlePageExit();
+            }
+        });
     }
 
     // Função para obter um cookie
@@ -115,8 +133,15 @@ class FormTracker {
      * Handler de saída da página - detecta abandono e envia interações pendentes
      */
     handlePageExit() {
+        // Evitar múltiplas chamadas
+        if (this._exitHandled) return;
+        this._exitHandled = true;
+
+        console.log('🔍 handlePageExit chamado - formSubmitted:', this.formSubmitted, '- lastField:', this.lastField);
+        
         // Se o formulário NÃO foi enviado com sucesso, registrar como abandono
         if (!this.formSubmitted) {
+            console.log('📤 Registrando abandono no campo:', this.lastField);
             const abandonInteraction = {
                 sessionId: this.sessionId,
                 fieldName: 'form_abandoned',
@@ -128,6 +153,7 @@ class FormTracker {
                 timestamp: new Date().toISOString()
             };
             this.interactions.push(abandonInteraction);
+            console.log('✅ Abandono adicionado, total interações:', this.interactions.length);
         }
 
         // Sempre tentar enviar interações pendentes ao sair
@@ -139,7 +165,8 @@ class FormTracker {
             };
             this.interactions = [];
             const blob = new Blob([JSON.stringify(dataToSend)], { type: 'application/json' });
-            navigator.sendBeacon('log_interaction.php', blob);
+            const sent = navigator.sendBeacon('log_interaction.php', blob);
+            console.log('📡 sendBeacon chamado:', sent ? 'SUCESSO' : 'FALHOU', '- URL:', window.location.href);
         }
 
         // Salvar estado nos cookies para recuperação
