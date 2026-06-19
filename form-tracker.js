@@ -120,9 +120,10 @@ class FormTracker {
             const abandonInteraction = {
                 sessionId: this.sessionId,
                 fieldName: 'form_abandoned',
-                fieldLabel: 'Formulário Abandonado',
+                // Usar o último campo real como fieldLabel (para análise de abandono)
+                fieldLabel: this.lastField || 'Nenhum campo preenchido',
                 action: 'form_abandoned',
-                fieldValue: this.lastField || 'Nenhum campo preenchido',
+                fieldValue: 'Sessão abandonada',
                 userName: this.userName,
                 timestamp: new Date().toISOString()
             };

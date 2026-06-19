@@ -581,7 +581,7 @@ if (isAdmin()) {
         
         try {
             // Buscar último campo de cada sessão que NÃO completou o formulário
-            // (sessões sem ação form_submitted ou form_submit_click)
+            // Prioriza o campo registrado no evento form_abandoned (que tem o campo real)
             $stmt = $pdo->query("
                 SELECT 
                     ultimo_campo,
@@ -589,11 +589,17 @@ if (isAdmin()) {
                 FROM (
                     SELECT 
                         fi.session_id,
-                        fi.ultimo_campo,
-                        MAX(fi.timestamp) as last_time
+                        COALESCE(
+                            (SELECT fi2.ultimo_campo FROM form_interactions fi2 
+                             WHERE fi2.session_id = fi.session_id 
+                             AND fi2.acao = 'form_abandoned' 
+                             LIMIT 1),
+                            fi.ultimo_campo
+                        ) as ultimo_campo
                     FROM form_interactions fi
                     WHERE fi.ultimo_campo IS NOT NULL
                     AND fi.ultimo_campo != ''
+                    AND fi.ultimo_campo != 'Acesso ao Formulário'
                     AND fi.session_id NOT IN (
                         SELECT DISTINCT session_id 
                         FROM form_interactions 
