@@ -580,20 +580,27 @@ if (isAdmin()) {
         header('Content-Type: application/json');
         
         try {
-            // Buscar último campo de cada sessão que não completou o formulário
+            // Buscar último campo de cada sessão que NÃO completou o formulário
+            // (sessões sem ação form_submitted ou form_submit_click)
             $stmt = $pdo->query("
                 SELECT 
                     ultimo_campo,
                     COUNT(*) as count
                 FROM (
                     SELECT 
-                        session_id,
-                        ultimo_campo,
-                        MAX(timestamp) as last_time
-                    FROM form_interactions
-                    WHERE ultimo_campo IS NOT NULL
-                    GROUP BY session_id
-                ) as last_interactions
+                        fi.session_id,
+                        fi.ultimo_campo,
+                        MAX(fi.timestamp) as last_time
+                    FROM form_interactions fi
+                    WHERE fi.ultimo_campo IS NOT NULL
+                    AND fi.ultimo_campo != ''
+                    AND fi.session_id NOT IN (
+                        SELECT DISTINCT session_id 
+                        FROM form_interactions 
+                        WHERE acao IN ('form_submitted', 'form_submit_click')
+                    )
+                    GROUP BY fi.session_id
+                ) as abandoned_sessions
                 GROUP BY ultimo_campo
                 ORDER BY count DESC
                 LIMIT 10
