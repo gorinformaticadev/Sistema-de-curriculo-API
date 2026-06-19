@@ -14,40 +14,38 @@ function apiGetInteractionStats($pdo) {
     }
     
     try {
-        // Total de sessões únicas (excluir sessões que só têm form_access sem nenhuma outra interação)
+        // Total de sessões únicas (todas as sessões, incluindo as que só têm form_access)
         $stmt = $pdo->query("
             SELECT COUNT(DISTINCT session_id) as total 
-            FROM form_interactions 
-            WHERE acao NOT IN ('form_access')
+            FROM form_interactions
         ");
         $totalSessions = $stmt->fetchColumn();
 
-        // Se não houver dados filtrados, contar todas as sessões
-        if ($totalSessions == 0) {
-            $stmt = $pdo->query("SELECT COUNT(DISTINCT session_id) as total FROM form_interactions");
-            $totalSessions = $stmt->fetchColumn();
-        }
-
-        // Formulários completos (sessões com ação form_submitted OU com currículo cadastrado)
+        // Formulários completos: apenas sessões com ação de submit real
+        // (form_submitted = formulário enviado com sucesso, form_submit_click = botão clicado)
         $stmt = $pdo->query("
-            SELECT COUNT(DISTINCT fi.session_id) as total 
-            FROM form_interactions fi
-            WHERE fi.acao IN ('form_submitted', 'form_submit_click')
+            SELECT COUNT(DISTINCT session_id) as total 
+            FROM form_interactions
+            WHERE acao IN ('form_submitted', 'form_submit_click')
         ");
-        $completedByAction = $stmt->fetchColumn();
+        $completedForms = $stmt->fetchColumn();
 
-        // Também verificar por currículo cadastrado na mesma data
+        // Também contar currículos cadastrados relacionados por IP + janela de 5 min
+        // (pegar currículos que foram inseridos mas cujo form_submitted pode não ter sido registrado)
         $stmt = $pdo->query("
-            SELECT COUNT(DISTINCT fi.session_id) as total 
+            SELECT COUNT(DISTINCT fi.session_id) as total
             FROM form_interactions fi
-            INNER JOIN curriculos c ON DATE(fi.timestamp) = DATE(c.data_cadastro)
+            INNER JOIN curriculos c 
+                ON c.ip_cadastro = fi.ip 
+                AND ABS(TIMESTAMPDIFF(MINUTE, fi.timestamp, c.data_cadastro)) <= 5
+            WHERE fi.acao NOT IN ('form_access', 'form_abandoned')
         ");
         $completedByCurriculo = $stmt->fetchColumn();
 
-        // Usar o maior valor entre as duas métricas
-        $completedForms = max($completedByAction, $completedByCurriculo);
+        // Usar o maior valor, mas sem inflar artificialmente
+        $completedForms = max($completedForms, $completedByCurriculo);
 
-        // Abandonos (sessões com ação form_abandoned ou sem currículo cadastrado)
+        // Abandonos: sessões que NÃO completaram
         $abandonedForms = $totalSessions - $completedForms;
         if ($abandonedForms < 0) $abandonedForms = 0;
 
@@ -179,17 +177,7 @@ function apiGetInteractionSessions($pdo) {
 
         // Para cada sessão, verificar se foi completada
         foreach ($sessions as &$session) {
-            // 1. Verificar se existe currículo cadastrado próximo ao horário da sessão
-            $stmt = $pdo->prepare("
-                SELECT id FROM curriculos 
-                WHERE ip_cadastro = ? 
-                AND ABS(TIMESTAMPDIFF(MINUTE, data_cadastro, ?)) <= 30
-                LIMIT 1
-            ");
-            $stmt->execute([$session['ip'], $session['last_interaction']]);
-            $hasCurriculo = $stmt->rowCount() > 0;
-
-            // 2. Verificar se houve clique no botão de finalizar (ação 'form_submitted' ou 'form_submit_click')
+            // 1. Verificar se houve ação de submit (indicador mais confiável)
             $stmt2 = $pdo->prepare("
                 SELECT 1 FROM form_interactions 
                 WHERE session_id = ? 
@@ -199,7 +187,17 @@ function apiGetInteractionSessions($pdo) {
             $stmt2->execute([$session['session_id']]);
             $hasSubmitAction = $stmt2->rowCount() > 0;
 
-            $session['completed'] = $hasCurriculo || $hasSubmitAction;
+            // 2. Verificar se existe currículo cadastrado com mesmo IP e janela de 5 min
+            $stmt = $pdo->prepare("
+                SELECT id FROM curriculos 
+                WHERE ip_cadastro = ? 
+                AND ABS(TIMESTAMPDIFF(MINUTE, data_cadastro, ?)) <= 5
+                LIMIT 1
+            ");
+            $stmt->execute([$session['ip'], $session['last_interaction']]);
+            $hasCurriculo = $stmt->rowCount() > 0;
+
+            $session['completed'] = $hasSubmitAction || $hasCurriculo;
         }
 
         return jsonResponse(true, 'Sessões carregadas com sucesso', ['sessions' => $sessions]);
@@ -368,10 +366,11 @@ function apiGetDeviceAnalysis($pdo) {
         $stmt = $pdo->query("
             SELECT 
                 device,
-                COUNT(*) as total_sessions,
-                COUNT(CASE WHEN nome_completo IS NOT NULL THEN 1 END) as completed_sessions,
+                COUNT(DISTINCT session_id) as total_sessions,
+                COUNT(DISTINCT CASE WHEN acao IN ('form_submitted', 'form_submit_click') THEN session_id END) as completed_sessions,
                 ROUND(
-                    COUNT(CASE WHEN nome_completo IS NOT NULL THEN 1 END) * 100.0 / COUNT(*), 2
+                    COUNT(DISTINCT CASE WHEN acao IN ('form_submitted', 'form_submit_click') THEN session_id END) * 100.0 
+                    / NULLIF(COUNT(DISTINCT session_id), 0), 2
                 ) as conversion_rate
             FROM form_interactions
             GROUP BY device
@@ -384,10 +383,11 @@ function apiGetDeviceAnalysis($pdo) {
         $stmt = $pdo->query("
             SELECT 
                 browser,
-                COUNT(*) as total_sessions,
-                COUNT(CASE WHEN nome_completo IS NOT NULL THEN 1 END) as completed_sessions,
+                COUNT(DISTINCT session_id) as total_sessions,
+                COUNT(DISTINCT CASE WHEN acao IN ('form_submitted', 'form_submit_click') THEN session_id END) as completed_sessions,
                 ROUND(
-                    COUNT(CASE WHEN nome_completo IS NOT NULL THEN 1 END) * 100.0 / COUNT(*), 2
+                    COUNT(DISTINCT CASE WHEN acao IN ('form_submitted', 'form_submit_click') THEN session_id END) * 100.0 
+                    / NULLIF(COUNT(DISTINCT session_id), 0), 2
                 ) as conversion_rate
             FROM form_interactions
             GROUP BY browser
@@ -428,7 +428,7 @@ function apiGetTimeAnalysis($pdo) {
             WHERE session_id IN (
                 SELECT DISTINCT session_id 
                 FROM form_interactions 
-                WHERE nome_completo IS NOT NULL
+                WHERE acao IN ('form_submitted', 'form_submit_click')
             )
             GROUP BY session_id
             HAVING duration_seconds > 0

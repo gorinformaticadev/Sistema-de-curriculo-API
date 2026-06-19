@@ -534,13 +534,25 @@ if (isAdmin()) {
             $stmt = $pdo->query("SELECT COUNT(DISTINCT session_id) as total FROM form_interactions");
             $totalSessions = $stmt->fetchColumn();
 
-            // Formulários completos (sessões que têm registro na tabela curriculos)
+            // Formulários completos: sessões com ação de submit real
             $stmt = $pdo->query("
-                SELECT COUNT(DISTINCT fi.session_id) as total 
-                FROM form_interactions fi
-                INNER JOIN curriculos c ON DATE(fi.timestamp) = DATE(c.data_cadastro)
+                SELECT COUNT(DISTINCT session_id) as total 
+                FROM form_interactions 
+                WHERE acao IN ('form_submitted', 'form_submit_click')
             ");
             $completedForms = $stmt->fetchColumn();
+
+            // Também contar por IP + janela de 5 min (fallback)
+            $stmt = $pdo->query("
+                SELECT COUNT(DISTINCT fi.session_id) as total
+                FROM form_interactions fi
+                INNER JOIN curriculos c 
+                    ON c.ip_cadastro = fi.ip 
+                    AND ABS(TIMESTAMPDIFF(MINUTE, fi.timestamp, c.data_cadastro)) <= 5
+                WHERE fi.acao NOT IN ('form_access', 'form_abandoned')
+            ");
+            $completedByCurriculo = $stmt->fetchColumn();
+            $completedForms = max($completedForms, $completedByCurriculo);
 
             // Abandonos
             $abandonedForms = $totalSessions - $completedForms;
