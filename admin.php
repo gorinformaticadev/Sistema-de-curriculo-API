@@ -2743,52 +2743,58 @@ Equipe de RH</textarea>
                 const deviceIcon = session.device === 'Mobile' ? 'fa-mobile-alt' : 
                                   session.device === 'Tablet' ? 'fa-tablet-alt' : 'fa-desktop';
                 
-                html += `
-                    <div class="session-card ${status}">
-                        <div class="session-header">
-                            <div>
-                                <strong>${session.nome_completo || 'Nome não informado'}</strong>
-                                <span class="session-badge ${status}">
-                                    <i class="fas ${statusIcon}"></i> ${statusText}
-                                </span>
-                            </div>
-                            <button class="btn-expand" onclick="toggleSessionDetails('${session.session_id}', this)">
-                                <i class="fas fa-chevron-down"></i> Ver Detalhes
-                            </button>
-                        </div>
-                        <div class="session-info">
-                            <div class="session-info-item">
-                                <i class="fas fa-network-wired"></i>
-                                <span>IP: ${session.ip}</span>
-                            </div>
-                            <div class="session-info-item">
-                                <i class="fas ${deviceIcon}"></i>
-                                <span>${session.device} - ${session.os}</span>
-                            </div>
-                            <div class="session-info-item">
-                                <i class="fas fa-browser"></i>
-                                <span>${session.browser}</span>
-                            </div>
-                            <div class="session-info-item">
-                                <i class="fas fa-clock"></i>
-                                <span>${firstTime}</span>
-                            </div>
-                            <div class="session-info-item">
-                                <i class="fas fa-mouse-pointer"></i>
-                                <span>${session.interaction_count} interações</span>
-                            </div>
-                        </div>
-                        ${!session.completed ? `
-                            <div style="margin-top: 10px; padding: 10px; background: #fef3c7; border-radius: 6px; font-size: 0.9rem;">
-                                <i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i>
-                                <strong>Último campo interagido:</strong> ${session.ultimo_campo || 'Desconhecido'}
-                            </div>
-                        ` : ''}
-                        <div class="session-timeline" id="timeline-${session.session_id}" style="display: none;">
-                            <p style="text-align: center; color: #6b7280;">Carregando timeline...</p>
-                        </div>
-                    </div>
-                `;
+	                html += `
+	                    <div class="session-card ${status}">
+	                        <div class="session-header">
+	                            <div>
+	                                <strong style="font-size: 1.1rem; color: #1e40af;">${session.nome_completo || 'Usuário não identificado'}</strong>
+	                                <span class="session-badge ${status}">
+	                                    <i class="fas ${statusIcon}"></i> ${statusText}
+	                                </span>
+	                            </div>
+	                            <button class="btn-expand" onclick="toggleSessionDetails('${session.session_id}', this)">
+	                                <i class="fas fa-chevron-down"></i> Ver Linha do Tempo
+	                            </button>
+	                        </div>
+	                        <div class="session-info">
+	                            <div class="session-info-item" title="Endereço IP">
+	                                <i class="fas fa-network-wired"></i>
+	                                <span>IP: ${session.ip}</span>
+	                            </div>
+	                            <div class="session-info-item" title="Dispositivo e Sistema">
+	                                <i class="fas ${deviceIcon}"></i>
+	                                <span>${session.device} - ${session.os}</span>
+	                            </div>
+	                            <div class="session-info-item" title="Navegador">
+	                                <i class="fas fa-globe"></i>
+	                                <span>${session.browser}</span>
+	                            </div>
+	                            <div class="session-info-item" title="Data e Hora">
+	                                <i class="fas fa-clock"></i>
+	                                <span>${lastTime}</span>
+	                            </div>
+	                            <div class="session-info-item" title="Interações">
+	                                <i class="fas fa-mouse-pointer"></i>
+	                                <span>${session.interaction_count} interações</span>
+	                            </div>
+	                        </div>
+	                        <div style="margin-top: 10px; padding: 12px; background: ${session.completed ? '#f0fdf4' : '#fef3c7'}; border-radius: 8px; border-left: 4px solid ${session.completed ? '#22c55e' : '#f59e0b'};">
+	                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.95rem;">
+	                                <div>
+	                                    <i class="fas fa-step-forward" style="color: #6b7280;"></i>
+	                                    <strong>Último campo:</strong> <span style="color: #1f2937; font-weight: 600;">${session.ultimo_campo || 'Nenhum'}</span>
+	                                </div>
+	                                <div>
+	                                    <i class="fas fa-hourglass-half" style="color: #6b7280;"></i>
+	                                    <strong>Duração:</strong> ${Math.round((new Date(session.last_interaction) - new Date(session.first_interaction)) / 1000 / 60)} min
+	                                </div>
+	                            </div>
+	                        </div>
+	                        <div class="session-timeline" id="timeline-${session.session_id}" style="display: none;">
+	                            <p style="text-align: center; color: #6b7280;">Carregando linha do tempo...</p>
+	                        </div>
+	                    </div>
+	                `;
             });
             
             container.innerHTML = html;
@@ -2848,9 +2854,10 @@ Equipe de RH</textarea>
                 'file_selected': '📎 Anexou arquivo em',
                 'form_access': '🌐 Acessou o formulário',
                 'form_abandoned': '🚪 Abandonou o formulário',
-                'form_submitted': '✅ Finalizou o cadastro',
-                'form_submit_click': '🖱️ Clicou em finalizar'
-            };
+	                'form_submitted': '✅ Finalizou o cadastro',
+	                'form_submit_click': '🖱️ Clicou em finalizar',
+	                'update_state': '🔄 Atualização de estado'
+	            };
             
             let html = '<h5 style="margin-top: 0; color: #1f2937;"><i class="fas fa-history"></i> Timeline de Interações</h5>';
             html += '<div style="background: #f9fafb; padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 0.85rem; color: #6b7280;">';

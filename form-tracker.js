@@ -9,7 +9,7 @@ class FormTracker {
         this.lastField = null;
         this.userName = null;
         this.interactions = [];
-        this.sendInterval = 5000; // Enviar dados a cada 5 segundos
+        this.sendInterval = 3000; // Reduzido para 3 segundos para maior precisão
         this.formSubmitted = false; // Rastrear se o formulário foi enviado com sucesso
         this.blurListenerAdded = false; // Evitar registrar múltiplos listeners de blur
         this.init();
@@ -253,14 +253,10 @@ class FormTracker {
         const fieldName = element.name || element.id || 'unknown';
         const fieldLabel = this.getFieldLabel(element);
 
-        // Atualizar último campo
-        this.lastField = fieldLabel || fieldName;
-
         // Obter valor REAL do campo
         let fieldValue = '';
         
         if (element.type === 'file') {
-            // Para arquivos, apenas indicar que foi anexado
             if (element.files.length > 0) {
                 const file = element.files[0];
                 fieldValue = `Arquivo anexado: ${file.name} (${(file.size / 1024).toFixed(1)}KB)`;
@@ -268,24 +264,28 @@ class FormTracker {
                 fieldValue = 'Nenhum arquivo selecionado';
             }
         } else if (element.type === 'radio' || element.type === 'checkbox') {
-            // Para radio e checkbox, capturar o valor selecionado
             if (element.checked) {
                 fieldValue = element.value;
+            } else {
+                return; // Não registrar se desmarcou (opcional, mas evita ruído)
             }
         } else if (element.tagName === 'SELECT') {
-            // Para selects, capturar o texto da opção selecionada
             fieldValue = element.options[element.selectedIndex]?.text || element.value;
-        } else if (element.tagName === 'TEXTAREA' || element.type === 'text' || element.type === 'email' || element.type === 'tel' || element.type === 'date') {
-            // Para todos os outros campos de texto, capturar o valor real
-            fieldValue = element.value || '';
         } else {
-            // Fallback para outros tipos
             fieldValue = element.value || '';
         }
 
-        // Atualizar nome do usuário se for o campo de nome
-        if (element.name === 'name' && fieldValue) {
+        // Se o campo for o nome, atualizar this.userName globalmente
+        if (fieldName === 'name' && fieldValue.trim() !== '') {
             this.userName = fieldValue;
+            // Persistir nome no cookie para recuperar em caso de reload
+            this.updatePersistentData();
+        }
+
+        // Atualizar último campo preenchido
+        if (fieldValue.trim() !== '') {
+            this.lastField = fieldLabel || fieldName;
+            this.updatePersistentData();
         }
 
         const interaction = {
@@ -348,8 +348,28 @@ class FormTracker {
         return nameMap[element.name] || element.name;
     }
 
+    updatePersistentData() {
+        const dataToSave = {
+            lastField: this.lastField,
+            userName: this.userName
+        };
+        this.setCookie('formTrackerState', JSON.stringify(dataToSave), 1);
+    }
+
     async sendInteractions(isBeforeUnload = false) {
-        if (this.interactions.length === 0) return;
+        // Tentar recuperar nome/último campo se estiverem nulos
+        if (!this.userName || !this.lastField) {
+            const savedState = this.getCookie('formTrackerState');
+            if (savedState) {
+                try {
+                    const state = JSON.parse(savedState);
+                    if (!this.userName) this.userName = state.userName;
+                    if (!this.lastField) this.lastField = state.lastField;
+                } catch(e) {}
+            }
+        }
+
+        if (this.interactions.length === 0 && !isBeforeUnload) return;
 
         const dataToSend = {
             interactions: [...this.interactions],

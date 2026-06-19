@@ -121,9 +121,9 @@ try {
         throw new Exception('Dados inválidos recebidos. Input: ' . substr($input, 0, 200));
     }
 
-    $interactions = $data['interactions'];
-    $lastField = $data['lastField'] ?? null;
-    $userName = $data['userName'] ?? null;
+    $interactions = $data['interactions'] ?? [];
+    $globalLastField = $data['lastField'] ?? null;
+    $globalUserName = $data['userName'] ?? null;
 
     // Obter informações do cliente
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
@@ -142,6 +142,17 @@ try {
     $insertedCount = 0;
     $errors = [];
 
+    // Se não houver interações mas houver dados globais (ex: abandono sem novos campos)
+    if (empty($interactions) && ($globalLastField || $globalUserName)) {
+        $interactions[] = [
+            'sessionId' => $data['sessionId'] ?? 'unknown',
+            'action' => 'update_state',
+            'fieldLabel' => $globalLastField,
+            'fieldValue' => 'Atualização de estado',
+            'timestamp' => date('c')
+        ];
+    }
+
     foreach ($interactions as $interaction) {
         try {
             $sessionId = $interaction['sessionId'] ?? 'unknown';
@@ -149,6 +160,15 @@ try {
             $action = $interaction['action'] ?? 'unknown';
             $fieldValue = $interaction['fieldValue'] ?? '';
             $timestamp = $interaction['timestamp'] ?? date('Y-m-d H:i:s');
+            
+            // Usar o nome do usuário da interação ou o global
+            $currentUserName = $interaction['userName'] ?? $globalUserName;
+            
+            // Se for um evento de abandono, garantir que o último campo seja o global se o da interação for genérico
+            $currentLastField = $fieldLabel;
+            if ($action === 'form_abandoned' && $globalLastField) {
+                $currentLastField = $globalLastField;
+            }
 
             // Converter timestamp ISO para MySQL datetime
             $timestamp = date('Y-m-d H:i:s', strtotime($timestamp));
@@ -160,8 +180,8 @@ try {
                 $browser,
                 $os,
                 $device,
-                $userName,
-                $fieldLabel,
+                $currentUserName,
+                $currentLastField,
                 $action,
                 $fieldValue,
                 $timestamp
