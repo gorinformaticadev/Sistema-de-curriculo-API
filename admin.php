@@ -1160,6 +1160,195 @@ if (isAdmin()) {
             echo json_encode(['success' => false, 'message' => 'Erro ao deletar informação: ' . $e->getMessage()]);
         }
         exit;
+    // API para Upload de Atualização (.zip)
+    if (isset($_POST['action']) && $_POST['action'] === 'uploadUpdate' && canAccessAction('uploadUpdate')) {
+        header('Content-Type: application/json');
+        
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        if (!isset($_FILES['update_zip']) || $_FILES['update_zip']['error'] !== UPLOAD_ERR_OK) {
+            echo json_encode(['success' => false, 'message' => 'Erro no upload do arquivo.']);
+            exit;
+        }
+
+        $fileInfo = pathinfo($_FILES['update_zip']['name']);
+        if (strtolower($fileInfo['extension']) !== 'zip') {
+            echo json_encode(['success' => false, 'message' => 'Apenas arquivos .zip são permitidos.']);
+            exit;
+        }
+
+        $uploadDir = __DIR__ . '/uploads/';
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+        
+        $tempZip = $uploadDir . 'temp_update.zip';
+        $tempExtractDir = $uploadDir . 'temp_update/';
+        
+        if (move_uploaded_file($_FILES['update_zip']['tmp_name'], $tempZip)) {
+            // Extrair
+            $zip = new ZipArchive;
+            if ($zip->open($tempZip) === TRUE) {
+                // Limpar diretório de extração se existir
+                if (is_dir($tempExtractDir)) {
+                    $files = new RecursiveIteratorIterator(
+                        new RecursiveDirectoryIterator($tempExtractDir, RecursiveDirectoryIterator::SKIP_DOTS),
+                        RecursiveIteratorIterator::CHILD_FIRST
+                    );
+                    foreach ($files as $fileinfo) {
+                        $todo = ($fileinfo->isDir() ? 'rmdir' : 'unlink');
+                        $todo($fileinfo->getRealPath());
+                    }
+                    rmdir($tempExtractDir);
+                }
+                
+                mkdir($tempExtractDir, 0755, true);
+                $zip->extractTo($tempExtractDir);
+                $zip->close();
+                
+                // Validar integridade
+                if (file_exists($tempExtractDir . 'manifest.json')) {
+                    $manifest = json_decode(file_get_contents($tempExtractDir . 'manifest.json'), true);
+                    if ($manifest && isset($manifest['version'])) {
+                        echo json_encode([
+                            'success' => true, 
+                            'message' => 'Upload e validação concluídos.',
+                            'version' => $manifest['version'],
+                            'notes' => $manifest['notes'] ?? 'Atualização padrão.'
+                        ]);
+                    } else {
+                        echo json_encode(['success' => false, 'message' => 'Manifesto inválido no arquivo .zip.']);
+                    }
+                } else {
+                    echo json_encode(['success' => false, 'message' => 'O arquivo .zip não é uma atualização válida (faltando manifest.json).']);
+                }
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Não foi possível ler o arquivo .zip.']);
+            }
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Falha ao salvar o arquivo enviado.']);
+        }
+        exit;
+    }
+
+    // API para Aplicar Atualização
+    if (isset($_POST['action']) && $_POST['action'] === 'applyUpdate' && canAccessAction('applyUpdate')) {
+        header('Content-Type: application/json');
+        
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        $baseDir = __DIR__;
+        $tempExtractDir = $baseDir . '/uploads/temp_update/';
+        $backupDir = $baseDir . '/backups/';
+        
+        if (!is_dir($tempExtractDir) || !file_exists($tempExtractDir . 'manifest.json')) {
+            echo json_encode(['success' => false, 'message' => 'Arquivos de atualização não encontrados ou inválidos. Faça o upload novamente.']);
+            exit;
+        }
+
+        try {
+            // 1. Fazer Backup
+            if (!is_dir($backupDir)) mkdir($backupDir, 0755, true);
+            $backupFile = $backupDir . 'backup_' . date('Ymd_His') . '.zip';
+            
+            if (extension_loaded('zip')) {
+                $zip = new ZipArchive();
+                if ($zip->open($backupFile, ZipArchive::CREATE | ZipArchive::OVERWRITE)) {
+                    $files = new RecursiveIteratorIterator(
+                        new RecursiveDirectoryIterator($baseDir, RecursiveDirectoryIterator::SKIP_DOTS),
+                        RecursiveIteratorIterator::SELF_FIRST
+                    );
+                    foreach ($files as $file) {
+                        $fileReal = realpath($file);
+                        if (is_dir($fileReal)) continue;
+                        
+                        $relativePath = str_replace($baseDir . DIRECTORY_SEPARATOR, '', $fileReal);
+                        $relativePath = str_replace('\\', '/', $relativePath);
+                        
+                        // Ignorar pastas e arquivos seguros
+                        if (strpos($relativePath, 'backups/') === 0 || 
+                            strpos($relativePath, 'uploads/') === 0 || 
+                            strpos($relativePath, '.git/') === 0 ||
+                            $relativePath === 'error.log' || 
+                            $relativePath === 'access.log') {
+                            continue;
+                        }
+                        $zip->addFile($fileReal, $relativePath);
+                    }
+                    $zip->close();
+                }
+            }
+
+            // 2. Copiar novos arquivos recursivamente
+            function copyUpdateFilesRecursive($src, $dst, $baseRoot) {
+                $dir = opendir($src);
+                @mkdir($dst, 0755, true);
+                while (false !== ($file = readdir($dir))) {
+                    if (($file != '.') && ($file != '..')) {
+                        $srcFile = $src . '/' . $file;
+                        $dstFile = $dst . '/' . $file;
+                        
+                        // Ignorar itens protegidos se estivermos na raiz
+                        if ($dst === $baseRoot && in_array($file, ['db_connect.php', '.env', 'uploads', 'backups', '.git', 'error.log', 'access.log'])) {
+                            continue;
+                        }
+                        
+                        if (is_dir($srcFile)) {
+                            copyUpdateFilesRecursive($srcFile, $dstFile, $baseRoot);
+                        } else {
+                            copy($srcFile, $dstFile);
+                        }
+                    }
+                }
+                closedir($dir);
+            }
+            
+            // Lidar com extração caso os arquivos estejam soltos ou dentro de uma pasta raiz do zip
+            $sourceDir = $tempExtractDir;
+            
+            copyUpdateFilesRecursive($sourceDir, $baseDir, $baseDir);
+
+            // 3. Atualizar Banco de Dados se necessário
+            if (file_exists($sourceDir . 'update.sql')) {
+                $sql = file_get_contents($sourceDir . 'update.sql');
+                if (!empty(trim($sql))) {
+                    try {
+                        $pdo->exec($sql);
+                        logError("Banco de dados atualizado com sucesso.", "INFO");
+                    } catch (PDOException $e) {
+                        logError("Erro ao rodar update.sql: " . $e->getMessage(), "ERROR");
+                        // Continua mesmo com erro, mas avisa
+                    }
+                }
+            }
+
+            // 4. Limpar temporários
+            function deleteDir($dirPath) {
+                if (!is_dir($dirPath)) return;
+                $files = scandir($dirPath);
+                foreach ($files as $file) {
+                    if ($file != '.' && $file != '..') {
+                        $path = $dirPath . '/' . $file;
+                        is_dir($path) ? deleteDir($path) : unlink($path);
+                    }
+                }
+                rmdir($dirPath);
+            }
+            deleteDir($tempExtractDir);
+            @unlink($baseDir . '/uploads/temp_update.zip');
+
+            logError("Sistema atualizado com sucesso por {$_SESSION['user_email']}", 'INFO');
+            echo json_encode(['success' => true, 'message' => 'Sistema atualizado com sucesso! O backup foi salvo em /backups.']);
+
+        } catch (Exception $e) {
+            logError('Erro durante a atualização: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Ocorreu um erro durante a atualização.']);
+        }
+        exit;
     }
 }
 
@@ -1664,6 +1853,7 @@ $totalCurriculos = $stmt->fetchColumn();
                       <button class="tab" onclick="showTab('tests')"><i class="fas fa-vial"></i> Testes da API</button>
                       <button class="tab" onclick="showTab('logs')"><i class="fas fa-file-alt"></i> Logs do Sistema</button>
                       <button class="tab" onclick="showTab('access')"><i class="fas fa-eye"></i> Logs de Acesso</button>
+                      <button class="tab" onclick="showTab('updates')"><i class="fas fa-upload"></i> Atualizações</button>
                       <?php endif; ?>
                   </div>
                 <?php endif; ?>
@@ -1940,6 +2130,40 @@ $totalCurriculos = $stmt->fetchColumn();
                     </div>
                 </div>
                 <?php endif; ?>
+                
+                <!-- Tab Atualizações -->
+                <?php if (getUserType() === 'admin'): ?>
+                <div id="updates-tab" class="tab-content">
+                    <div class="form-section">
+                        <h3><i class="fas fa-upload"></i> Atualização do Sistema (.zip)</h3>
+                        <p>Faça upload de um pacote de atualização oficial para instalar novas funcionalidades. Um backup será feito automaticamente antes da instalação.</p>
+                        
+                        <form id="uploadUpdateForm" style="margin-top: 20px;">
+                            <input type="hidden" name="action" value="uploadUpdate">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                            <div class="form-group">
+                                <input type="file" name="update_zip" accept=".zip" required>
+                            </div>
+                            <button type="submit" class="btn-primary" id="btnUploadUpdate"><i class="fas fa-upload"></i> Enviar Pacote de Atualização</button>
+                            <div id="uploadUpdateStatus" style="margin-top: 15px;"></div>
+                        </form>
+                        
+                        <div id="applyUpdateSection" style="display: none; margin-top: 30px; padding: 20px; border: 1px solid #10b981; border-radius: 8px; background-color: #ecfdf5;">
+                            <h4 style="color: #065f46;"><i class="fas fa-check-circle"></i> Atualização Validada!</h4>
+                            <p id="updateVersionInfo" style="margin: 10px 0; color: #047857;"></p>
+                            <p style="font-size: 0.9em; color: #064e3b; margin-bottom: 15px;">Todos os dados, banco de dados e arquivos de currículos (uploads) não serão afetados. Um backup será gerado automaticamente.</p>
+                            
+                            <form id="applyUpdateForm">
+                                <input type="hidden" name="action" value="applyUpdate">
+                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                                <button type="submit" class="btn-primary" style="background-color: #10b981;" id="btnApplyUpdate"><i class="fas fa-play"></i> Instalar Atualização Agora</button>
+                                <div id="applyUpdateStatus" style="margin-top: 15px;"></div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+
             </div>
         </div>
     </div>
@@ -3509,6 +3733,68 @@ Equipe de RH</textarea>
                 }
             }
         });
+        // Lógica de Atualização (Upload e Apply)
+        if (document.getElementById('uploadUpdateForm')) {
+            document.getElementById('uploadUpdateForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                const statusDiv = document.getElementById('uploadUpdateStatus');
+                const btn = document.getElementById('btnUploadUpdate');
+                
+                statusDiv.innerHTML = '<span style="color: #4b5563;"><i class="fas fa-spinner fa-spin"></i> Enviando e validando arquivo...</span>';
+                btn.disabled = true;
+
+                fetch('admin.php', { method: 'POST', body: formData })
+                .then(r => r.text())
+                .then(text => {
+                    try {
+                        const data = JSON.parse(text);
+                        if (data.success) {
+                            statusDiv.innerHTML = `<span style="color: #10b981;">${data.message}</span>`;
+                            document.getElementById('applyUpdateSection').style.display = 'block';
+                            document.getElementById('updateVersionInfo').innerHTML = `<strong>Versão Pronta:</strong> ${data.version}<br><strong>Notas:</strong> ${data.notes}`;
+                        } else {
+                            statusDiv.innerHTML = `<span style="color: #ef4444;">${data.message}</span>`;
+                            btn.disabled = false;
+                        }
+                    } catch (e) {
+                        console.error('Resposta do servidor não é JSON:', text);
+                        statusDiv.innerHTML = `<span style="color: #ef4444;">Erro interno do servidor. Pressione F12 e olhe o console para ver o erro do PHP. (Ou o arquivo é maior que o permitido).</span>`;
+                        btn.disabled = false;
+                    }
+                })
+                .catch(err => {
+                    statusDiv.innerHTML = `<span style="color: #ef4444;">Erro de conexão ao enviar o arquivo.</span>`;
+                    btn.disabled = false;
+                });
+            });
+
+            document.getElementById('applyUpdateForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                const statusDiv = document.getElementById('applyUpdateStatus');
+                const btn = document.getElementById('btnApplyUpdate');
+                
+                statusDiv.innerHTML = '<span style="color: #4b5563;"><i class="fas fa-spinner fa-spin"></i> Criando backup e instalando atualização. Isso pode demorar alguns minutos...</span>';
+                btn.disabled = true;
+
+                fetch('admin.php', { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        statusDiv.innerHTML = `<span style="color: #10b981;">${data.message} Recarregando painel...</span>`;
+                        setTimeout(() => window.location.reload(), 3000);
+                    } else {
+                        statusDiv.innerHTML = `<span style="color: #ef4444;">${data.message}</span>`;
+                        btn.disabled = false;
+                    }
+                })
+                .catch(err => {
+                    statusDiv.innerHTML = `<span style="color: #ef4444;">Erro de conexão ao aplicar a atualização.</span>`;
+                    btn.disabled = false;
+                });
+            });
+        }
     </script>
 
     <!-- Modal de Informações de Contato -->
