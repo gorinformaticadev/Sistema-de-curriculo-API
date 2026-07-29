@@ -606,25 +606,32 @@ body {
 }
 
 /* Tables */
-.curriculos-table {
+.table-container {
     width: 100%;
-    border-collapse: collapse;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     margin-top: 20px;
 }
 
-.curriculos-table th,
-.curriculos-table td {
+.curriculos-table, .data-table {
+    width: 100%;
+    min-width: 600px;
+    border-collapse: collapse;
+}
+
+.curriculos-table th, .data-table th,
+.curriculos-table td, .data-table td {
     padding: 12px;
     text-align: left;
     border-bottom: 1px solid #e5e7eb;
 }
 
-.curriculos-table th {
+.curriculos-table th, .data-table th {
     background: #f9fafb;
     font-weight: 600;
 }
 
-.curriculos-table tr:hover {
+.curriculos-table tr:hover, .data-table tr:hover {
     background: #f9fafb;
 }
 
@@ -722,12 +729,20 @@ body {
         font-size: 1.1rem;
     }
     
+    .form-container {
+        padding: 20px 15px;
+    }
+    
     .welcome-section, .privacy-section, .job-info {
         padding: 15px;
     }
     
     .form-section {
-        padding: 20px;
+        padding: 15px;
+    }
+    
+    .form-row {
+        gap: 15px;
     }
 }
 

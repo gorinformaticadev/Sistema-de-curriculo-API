@@ -206,6 +206,11 @@
                 text-align: center;
             }
             
+            .user-info {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
             .dashboard-grid {
                 grid-template-columns: 1fr;
             }

@@ -96,6 +96,12 @@
             color: #6b7280;
             font-size: 0.9rem;
         }
+        
+        @media (max-width: 480px) {
+            .login-form {
+                padding: 20px;
+            }
+        }
     </style>
 </head>
 <body>
