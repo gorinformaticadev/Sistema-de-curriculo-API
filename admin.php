@@ -706,6 +706,7 @@ $totalCurriculos = $stmt->fetchColumn();
                     <button class="tab" onclick="showTab('config')"><i class="fas fa-cog"></i> Configurações</button>
                     <button class="tab" onclick="showTab('tests')"><i class="fas fa-vial"></i> Testes da API</button>
                     <button class="tab" onclick="showTab('logs')"><i class="fas fa-file-alt"></i> Logs do Sistema</button>
+                    <button class="tab" onclick="showTab('updates')"><i class="fas fa-sync-alt"></i> Atualizações</button>
                 </div>
 
                 <!-- Tab Currículos -->
@@ -842,6 +843,47 @@ $totalCurriculos = $stmt->fetchColumn();
                         <button type="submit" class="btn-primary"><i class="fas fa-paper-plane"></i> Enviar Mensagem de Teste</button>
                         <div id="testResult" class="success-message admin-test-result"></div>
                     </form>
+                </div>
+
+                <!-- Tab Atualizações -->
+                <div id="updates-tab" class="tab-content">
+                    <div class="form-section">
+                        <h3><i class="fas fa-sync-alt"></i> Atualizar Sistema</h3>
+
+                        <div class="update-info">
+                            <p><i class="fas fa-info-circle"></i> Use esta ferramenta para atualizar o sistema enviando um arquivo ZIP contendo os novos arquivos.</p>
+                            <p><strong>Importante:</strong> O sistema fará um backup automático antes de atualizar. Em caso de erro, o rollback será automático.</p>
+                        </div>
+
+                        <form id="updateForm" class="update-form">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+
+                            <div class="form-group">
+                                <label class="required">Arquivo de Atualização (ZIP)</label>
+                                <div class="file-upload-area" id="dropZone">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <p>Arraste o arquivo ZIP aqui ou clique para selecionar</p>
+                                    <input type="file" id="updateZip" name="update_zip" accept=".zip" required>
+                                </div>
+                                <small>O arquivo ZIP deve conter os arquivos atualizados do sistema. Tamanho máximo: 50MB.</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Diretório de Backup (opcional)</label>
+                                <input type="text" id="backupDir" name="backup_dir" placeholder="Deixe em branco para usar o padrão (backups/update_YYYY-MM-DD_HH-MM-SS)">
+                            </div>
+
+                            <button type="button" id="validateBtn" class="btn-primary">
+                                <i class="fas fa-check-circle"></i> Validar Arquivo
+                            </button>
+                            <button type="button" id="updateBtn" class="btn-submit" style="display: none;">
+                                <i class="fas fa-sync-alt"></i> Confirmar e Atualizar
+                            </button>
+                        </form>
+
+                        <div id="validationResult" class="update-result" style="display: none;"></div>
+                        <div id="updateProgress" class="update-progress" style="display: none;"></div>
+                    </div>
                 </div>
 
                 <!-- Tab Logs -->
@@ -1133,6 +1175,143 @@ $totalCurriculos = $stmt->fetchColumn();
                 .catch(err => alert('Erro ao adicionar observação: ' + err));
         }
         
+        // ============================================
+        // SISTEMA DE ATUALIZAÇÃO
+        // ============================================
+        let updateTempPath = null;
+
+        // Drag and drop para upload
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('updateZip');
+
+        if (dropZone && fileInput) {
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-over');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('drag-over');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    fileInput.files = files;
+                    dropZone.querySelector('p').textContent = files[0].name;
+                }
+            });
+
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length > 0) {
+                    dropZone.querySelector('p').textContent = fileInput.files[0].name;
+                }
+            });
+        }
+
+        // Validar arquivo ZIP
+        document.getElementById('validateBtn').addEventListener('click', function() {
+            const fileInput = document.getElementById('updateZip');
+            const validationResult = document.getElementById('validationResult');
+            const updateBtn = document.getElementById('updateBtn');
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Selecione um arquivo ZIP para validar.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('action', 'validateZip');
+            formData.append('update_zip', fileInput.files[0]);
+            formData.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+
+            validationResult.style.display = 'block';
+            validationResult.innerHTML = '<div class="update-loading"><i class="fas fa-spinner fa-spin"></i> Validando arquivo...</div>';
+            updateBtn.style.display = 'none';
+
+            fetch('update.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        updateTempPath = data.temp_path;
+                        validationResult.innerHTML = `
+                            <div class="update-success">
+                                <h4><i class="fas fa-check-circle"></i> ${data.message}</h4>
+                                <p><strong>Arquivos encontrados:</strong> ${data.files_count}</p>
+                                <p><strong>Script de atualização:</strong> ${data.has_update_script ? '✅ Sim' : '❌ Não'}</p>
+                                ${data.has_update_script ? `<div class="update-script-preview"><strong>Preview do script SQL:</strong><pre>${data.update_script_preview}</pre></div>` : ''}
+                                <p class="update-warning"><i class="fas fa-exclamation-triangle"></i> <strong>Atenção:</strong> Esta ação irá modificar arquivos do sistema. Certifique-se de que o ZIP contém a versão correta.</p>
+                            </div>
+                        `;
+                        updateBtn.style.display = 'inline-flex';
+                    } else {
+                        validationResult.innerHTML = `<div class="update-error"><i class="fas fa-times-circle"></i> ${data.message}</div>`;
+                        updateBtn.style.display = 'none';
+                    }
+                })
+                .catch(err => {
+                    validationResult.innerHTML = `<div class="update-error"><i class="fas fa-times-circle"></i> Erro na validação: ${err}</div>`;
+                    updateBtn.style.display = 'none';
+                });
+        });
+
+        // Executar atualização
+        document.getElementById('updateBtn').addEventListener('click', function() {
+            if (!updateTempPath) {
+                alert('Valide o arquivo ZIP antes de atualizar.');
+                return;
+            }
+
+            if (!confirm('Deseja realmente atualizar o sistema?\n\nUm backup automático será criado antes da atualização.\nEm caso de erro, o rollback será automático.')) {
+                return;
+            }
+
+            const backupDir = document.getElementById('backupDir').value;
+            const updateProgress = document.getElementById('updateProgress');
+            const updateBtn = document.getElementById('updateBtn');
+            const validateBtn = document.getElementById('validateBtn');
+
+            updateBtn.disabled = true;
+            validateBtn.disabled = true;
+            updateProgress.style.display = 'block';
+            updateProgress.innerHTML = '<div class="update-loading"><i class="fas fa-spinner fa-spin"></i> Atualizando sistema... Por favor, aguarde.</div>';
+
+            const formData = new FormData();
+            formData.append('action', 'executeUpdate');
+            formData.append('temp_path', updateTempPath);
+            formData.append('backup_dir', backupDir);
+            formData.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+
+            fetch('update.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    updateProgress.innerHTML = `
+                        <div class="update-result ${data.success ? 'update-success' : 'update-error'}">
+                            <h4><i class="fas fa-${data.success ? 'check-circle' : 'times-circle'}"></i> ${data.message}</h4>
+                            <div class="update-logs">
+                                ${data.logs.map(log => `<div class="update-log-entry">${log}</div>`).join('')}
+                            </div>
+                            ${data.backup_path ? `<p><strong>Backup salvo em:</strong> ${data.backup_path}</p>` : ''}
+                            ${data.errors && data.errors.length > 0 ? `<div class="update-errors"><strong>Erros:</strong><ul>${data.errors.map(e => `<li>${e}</li>`).join('')}</ul></div>` : ''}
+                        </div>
+                    `;
+
+                    if (data.success) {
+                        updateBtn.style.display = 'none';
+                        validateBtn.style.display = 'none';
+                    }
+                })
+                .catch(err => {
+                    updateProgress.innerHTML = `<div class="update-error"><i class="fas fa-times-circle"></i> Erro na atualização: ${err}</div>`;
+                    updateBtn.disabled = false;
+                    validateBtn.disabled = false;
+                });
+        });
+
         // Salvar Config API
         document.getElementById('apiConfigForm').addEventListener('submit', function(e) {
             e.preventDefault();
