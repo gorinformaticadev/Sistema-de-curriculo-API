@@ -2064,18 +2064,18 @@ $totalCurriculos = $stmt->fetchColumn();
 
                             return `
                                 <tr>
-                                    <td>${new Date(c.data_cadastro).toLocaleString('pt-BR')}</td>
-                                    <td>${c.nome}</td>
-                                    <td>${c.telefone}</td>
-                                    <td>${c.email || 'N/A'}</td>
-                                    <td>${c.cidade}</td>
-                                    <td>${statusHtml}</td>
-                                    <td style="text-align: center;">
+                                    <td data-label="Data/Hora">${new Date(c.data_cadastro).toLocaleString('pt-BR')}</td>
+                                    <td data-label="Nome">${c.nome}</td>
+                                    <td data-label="Telefone">${c.telefone}</td>
+                                    <td data-label="Email">${c.email || 'N/A'}</td>
+                                    <td data-label="Cidade">${c.cidade}</td>
+                                    <td data-label="Status">${statusHtml}</td>
+                                    <td data-label="Contato" style="text-align: right;">
                                         <button class="btn-small" onclick="openContactInfoModal(${c.id}, '${c.nome.replace(/'/g, "\\'")}')" style="background: #3b82f6; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer;" title="Informações de Contato">
                                             <i class="fas fa-address-book"></i>
                                         </button>
                                     </td>
-                                    <td>
+                                    <td data-label="Ações">
                                         <button class="btn-primary btn-small" onclick="viewCurriculo(${c.id})"><i class="fas fa-eye"></i> Ver</button>
                                         <select class="status-select" onchange="changeStatus(${c.id}, this.value)" style="margin-left: 5px; padding: 2px 5px; font-size: 0.8rem;">
                                             <option value="pendente_novo" ${c.status === 'pendente_novo' ? 'selected' : ''}>Pendente - Novo</option>

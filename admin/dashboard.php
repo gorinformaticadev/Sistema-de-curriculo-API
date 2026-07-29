@@ -534,12 +534,12 @@
                                     <tbody>
                                         ${data.curriculos.map(c => `
                                             <tr>
-                                                <td>${new Date(c.data_cadastro).toLocaleString('pt-BR')}</td>
-                                                <td>${c.nome}</td>
-                                                <td>${c.telefone}</td>
-                                                <td>${c.email || 'N/A'}</td>
-                                                <td>${c.cidade}</td>
-                                                <td>
+                                                <td data-label="Data/Hora">${new Date(c.data_cadastro).toLocaleString('pt-BR')}</td>
+                                                <td data-label="Nome">${c.nome}</td>
+                                                <td data-label="Telefone">${c.telefone}</td>
+                                                <td data-label="Email">${c.email || 'N/A'}</td>
+                                                <td data-label="Cidade">${c.cidade}</td>
+                                                <td data-label="Ações">
                                                     <button class="btn-small btn-primary" onclick="viewCurriculo(${c.id})">
                                                         <i class="fas fa-eye"></i> Ver
                                                     </button>

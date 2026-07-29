@@ -615,7 +615,7 @@ body {
 
 .curriculos-table, .data-table {
     width: 100%;
-    min-width: 600px;
+    min-width: 800px;
     border-collapse: collapse;
 }
 
@@ -624,6 +624,7 @@ body {
     padding: 12px;
     text-align: left;
     border-bottom: 1px solid #e5e7eb;
+    white-space: nowrap;
 }
 
 .curriculos-table th, .data-table th {
@@ -710,13 +711,55 @@ body {
         margin: 20px;
     }
     
-    .curriculos-table {
-        font-size: 0.85rem;
+    /* Table to Card Mobile View */
+    .curriculos-table, .data-table {
+        min-width: 100%;
+        border: 0;
     }
     
-    .curriculos-table th,
-    .curriculos-table td {
-        padding: 8px;
+    .curriculos-table thead, .data-table thead {
+        display: none;
+    }
+    
+    .curriculos-table tr, .data-table tr {
+        display: block;
+        margin-bottom: 15px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .curriculos-table td, .data-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-align: right;
+        padding: 12px 15px;
+        border-bottom: 1px solid #f3f4f6;
+        white-space: normal;
+        word-break: break-word;
+        font-size: 0.9rem;
+    }
+    
+    .curriculos-table td:last-child, .data-table td:last-child {
+        border-bottom: 0;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        background: #f8fafc;
+        border-radius: 0 0 8px 8px;
+        padding-top: 15px;
+        padding-bottom: 15px;
+    }
+    
+    .curriculos-table td::before, .data-table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #6b7280;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        text-align: left;
     }
 }
 

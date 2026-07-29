@@ -23,10 +23,10 @@ function loadEnv($path) {
 loadEnv(__DIR__ . "/.env");
 
 // Configurações do Banco de Dados
-define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-define('DB_USER', getenv('DB_USER') ?: 'gorinf79_curriculosgor');
-define('DB_PASS', getenv('DB_PASS') ?: 'Gor103Dmas@');
-define('DB_NAME', getenv('DB_NAME') ?: 'gorinf79_curriculos2');
+define('DB_HOST', getenv('DB_HOST') !== false ? getenv('DB_HOST') : 'localhost');
+define('DB_USER', getenv('DB_USER') !== false ? getenv('DB_USER') : 'gorinf79_curriculosgor');
+define('DB_PASS', getenv('DB_PASS') !== false ? getenv('DB_PASS') : 'Gor103Dmas@');
+define('DB_NAME', getenv('DB_NAME') !== false ? getenv('DB_NAME') : 'gorinf79_curriculos2');
 
 // String de Conexão (DSN)
 $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
