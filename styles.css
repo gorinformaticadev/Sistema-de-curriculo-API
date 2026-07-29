@@ -624,6 +624,9 @@ body {
     padding: 12px;
     text-align: left;
     border-bottom: 1px solid #e5e7eb;
+}
+
+.curriculos-table th, .data-table th {
     white-space: nowrap;
 }
 

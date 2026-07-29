@@ -287,7 +287,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'updateCurriculoStatus' && c
         exit;
     }
 
-    $validStatuses = ['pendente_novo', 'pendente', 'classificado', 'arquivado'];
+    $validStatuses = ['pendente_novo', 'pendente', 'entrevista', 'teste', 'aprovado', 'classificado', 'banco_talentos', 'arquivado'];
     if (!in_array($status, $validStatuses)) {
         echo json_encode(['success' => false, 'message' => 'Status inválido.']);
         exit;
@@ -1607,9 +1607,25 @@ $totalCurriculos = $stmt->fetchColumn();
             background: #dbeafe;
             color: #1e40af;
         }
+        .status-entrevista {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+        .status-teste {
+            background: #ffedd5;
+            color: #9a3412;
+        }
+        .status-aprovado {
+            background: #dcfce7;
+            color: #166534;
+        }
         .status-classificado {
             background: #d1fae5;
             color: #065f46;
+        }
+        .status-banco {
+            background: #f3f4f6;
+            color: #374151;
         }
         .status-arquivado {
             background: #fee2e2;
@@ -1665,7 +1681,11 @@ $totalCurriculos = $stmt->fetchColumn();
                                     <option value="">Todos (exceto arquivados)</option>
                                     <option value="pendente_novo">Pendente - Novo</option>
                                     <option value="pendente">Pendente</option>
+                                    <option value="entrevista">Em Entrevista</option>
+                                    <option value="teste">Em Teste</option>
+                                    <option value="aprovado">Aprovado</option>
                                     <option value="classificado">Classificado</option>
+                                    <option value="banco_talentos">Banco de Talentos</option>
                                     <option value="arquivado">Arquivado</option>
                                 </select>
                             </div>
@@ -1678,12 +1698,14 @@ $totalCurriculos = $stmt->fetchColumn();
                         </div>
                     </div>
 
-                    <table class="curriculos-table">
-                        <thead><tr><th>Data/Hora</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Cidade</th><th>Status</th><th>Contato</th><th>Ações</th></tr></thead>
-                        <tbody id="curriculos-tbody">
-                            <!-- Conteúdo carregado via JS -->
-                        </tbody>
-                    </table>
+                    <div class="table-container">
+                        <table class="curriculos-table">
+                            <thead><tr><th>Data/Hora</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Cidade</th><th>Status</th><th>Contato</th><th>Ações</th></tr></thead>
+                            <tbody id="curriculos-tbody">
+                                <!-- Conteúdo carregado via JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Tab Interações do Formulário -->
@@ -1778,12 +1800,14 @@ $totalCurriculos = $stmt->fetchColumn();
                     <div style="margin-bottom: 20px;">
                         <button class="btn-primary" onclick="showAddUserModal()"><i class="fas fa-plus"></i> Adicionar Usuário</button>
                     </div>
-                    <table class="curriculos-table">
-                        <thead><tr><th>Email</th><th>Tipo</th><th>Data de Criação</th><th>Ações</th></tr></thead>
-                        <tbody id="users-tbody">
-                            <!-- Conteúdo carregado via JS -->
-                        </tbody>
-                    </table>
+                    <div class="table-container">
+                        <table class="curriculos-table">
+                            <thead><tr><th>Email</th><th>Tipo</th><th>Data de Criação</th><th>Ações</th></tr></thead>
+                            <tbody id="users-tbody">
+                                <!-- Conteúdo carregado via JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Tab Configurações -->
@@ -2056,7 +2080,11 @@ $totalCurriculos = $stmt->fetchColumn();
                             const statusLabels = {
                                 'pendente_novo': '<span class="status-badge status-novo">Pendente - Novo</span>',
                                 'pendente': '<span class="status-badge status-pendente">Pendente</span>',
+                                'entrevista': '<span class="status-badge status-entrevista">Em Entrevista</span>',
+                                'teste': '<span class="status-badge status-teste">Em Teste</span>',
+                                'aprovado': '<span class="status-badge status-aprovado">Aprovado</span>',
                                 'classificado': '<span class="status-badge status-classificado">Classificado</span>',
+                                'banco_talentos': '<span class="status-badge status-banco">Banco de Talentos</span>',
                                 'arquivado': '<span class="status-badge status-arquivado">Arquivado</span>'
                             };
 
@@ -2080,7 +2108,11 @@ $totalCurriculos = $stmt->fetchColumn();
                                         <select class="status-select" onchange="changeStatus(${c.id}, this.value)" style="margin-left: 5px; padding: 2px 5px; font-size: 0.8rem;">
                                             <option value="pendente_novo" ${c.status === 'pendente_novo' ? 'selected' : ''}>Pendente - Novo</option>
                                             <option value="pendente" ${c.status === 'pendente' ? 'selected' : ''}>Pendente</option>
+                                            <option value="entrevista" ${c.status === 'entrevista' ? 'selected' : ''}>Em Entrevista</option>
+                                            <option value="teste" ${c.status === 'teste' ? 'selected' : ''}>Em Teste</option>
+                                            <option value="aprovado" ${c.status === 'aprovado' ? 'selected' : ''}>Aprovado</option>
                                             <option value="classificado" ${c.status === 'classificado' ? 'selected' : ''}>Classificado</option>
+                                            <option value="banco_talentos" ${c.status === 'banco_talentos' ? 'selected' : ''}>Banco de Talentos</option>
                                             <option value="arquivado" ${c.status === 'arquivado' ? 'selected' : ''}>Arquivado</option>
                                         </select>
                                         ${c.is_whatsapp ? `<button class="btn-small" onclick="openWhatsAppModal(${c.id}, '${c.nome}', '${c.telefone}')" style="margin-left: 5px; background: #25d366; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;" title="Enviar WhatsApp"><i class="fab fa-whatsapp"></i></button>` : ''}
