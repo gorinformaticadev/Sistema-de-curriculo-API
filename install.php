@@ -82,7 +82,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 `arquivo_curriculo` VARCHAR(255),
                 `arquivo_foto` VARCHAR(255),
                 `ip_cadastro` VARCHAR(45),
-                `data_cadastro` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                `data_cadastro` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                `status` ENUM('pending', 'reviewing', 'interview_scheduled', 'interview_done', 'approved', 'rejected', 'archived') DEFAULT 'pending',
+                `status_updated_at` TIMESTAMP NULL DEFAULT NULL,
+                `notes` TEXT
             ) ENGINE=InnoDB;
             ";
             $pdo->exec($sql_curriculos);

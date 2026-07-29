@@ -175,9 +175,103 @@ if (isAdmin()) {
     // API para carregar currículos
     if (isset($_GET['action']) && $_GET['action'] === 'getCurriculos') {
         header('Content-Type: application/json');
-        $stmt = $pdo->query("SELECT id, nome, telefone, email, cidade, data_cadastro FROM curriculos ORDER BY data_cadastro DESC");
+
+        // Filtros
+        $statusFilter = $_GET['status'] ?? '';
+        $searchQuery = trim($_GET['search'] ?? '');
+
+        $sql = "SELECT id, nome, telefone, email, cidade, data_cadastro, status, notes FROM curriculos WHERE 1=1";
+        $params = [];
+
+        if ($statusFilter && $statusFilter !== 'all') {
+            $sql .= " AND status = ?";
+            $params[] = $statusFilter;
+        }
+
+        if ($searchQuery) {
+            $sql .= " AND (nome LIKE ? OR email LIKE ? OR telefone LIKE ? OR cidade LIKE ?)";
+            $searchParam = "%$searchQuery%";
+            $params[] = $searchParam;
+            $params[] = $searchParam;
+            $params[] = $searchParam;
+            $params[] = $searchParam;
+        }
+
+        $sql .= " ORDER BY data_cadastro DESC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $curriculos = $stmt->fetchAll();
         echo json_encode(['success' => true, 'curriculos' => $curriculos]);
+        exit;
+    }
+
+    // API para exportar currículos em CSV
+    if (isset($_GET['action']) && $_GET['action'] === 'exportCurriculosCSV') {
+        $statusFilter = $_GET['status'] ?? '';
+        $searchQuery = trim($_GET['search'] ?? '');
+
+        $sql = "SELECT id, nome, telefone, email, cidade, data_cadastro, status FROM curriculos WHERE 1=1";
+        $params = [];
+
+        if ($statusFilter && $statusFilter !== 'all') {
+            $sql .= " AND status = ?";
+            $params[] = $statusFilter;
+        }
+
+        if ($searchQuery) {
+            $sql .= " AND (nome LIKE ? OR email LIKE ? OR telefone LIKE ? OR cidade LIKE ?)";
+            $searchParam = "%$searchQuery%";
+            $params[] = $searchParam;
+            $params[] = $searchParam;
+            $params[] = $searchParam;
+            $params[] = $searchParam;
+        }
+
+        $sql .= " ORDER BY data_cadastro DESC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $curriculos = $stmt->fetchAll();
+
+        // Set headers for CSV download
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=curriculos_' . date('Y-m-d_H-i-s') . '.csv');
+
+        // Open output stream
+        $output = fopen('php://output', 'w');
+
+        // Add UTF-8 BOM for Excel compatibility
+        fputs($output, "\xEF\xBB\xBF");
+
+        // Header row
+        fputcsv($output, ['ID', 'Nome', 'Telefone', 'Email', 'Cidade', 'Data Cadastro', 'Status'], ';');
+
+        // Data rows
+        foreach ($curriculos as $c) {
+            $statusLabel = match($c['status']) {
+                'pending' => 'Pendente',
+                'reviewing' => 'Em Análise',
+                'interview_scheduled' => 'Entrevista Agendada',
+                'interview_done' => 'Entrevista Realizada',
+                'approved' => 'Aprovado',
+                'rejected' => 'Reprovado',
+                'archived' => 'Arquivado',
+                default => $c['status']
+            };
+
+            fputcsv($output, [
+                $c['id'],
+                $c['nome'],
+                $c['telefone'],
+                $c['email'] ?? '',
+                $c['cidade'],
+                date('d/m/Y H:i', strtotime($c['data_cadastro'])),
+                $statusLabel
+            ], ';');
+        }
+
+        fclose($output);
         exit;
     }
     
@@ -234,9 +328,98 @@ if (isAdmin()) {
             $curriculo['possui_cursos'] = $curriculo['possui_cursos'] ? 'Sim' : 'Não';
             $curriculo['possui_experiencia'] = $curriculo['possui_experiencia'] ? 'Sim' : 'Não';
 
+            // Status label mapping
+            $statusLabels = [
+                'pending' => 'Pendente',
+                'reviewing' => 'Em Análise',
+                'interview_scheduled' => 'Entrevista Agendada',
+                'interview_done' => 'Entrevista Realizada',
+                'approved' => 'Aprovado',
+                'rejected' => 'Reprovado',
+                'archived' => 'Arquivado'
+            ];
+            $curriculo['status_label'] = $statusLabels[$curriculo['status']] ?? $curriculo['status'];
+
             echo json_encode(['success' => true, 'curriculo' => $curriculo]);
         } else {
             echo json_encode(['success' => false, 'message' => 'Currículo não encontrado.']);
+        }
+        exit;
+    }
+
+    // API para atualizar status do currículo
+    if (isset($_POST['action']) && $_POST['action'] === 'updateCurriculoStatus') {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        $newStatus = $_POST['status'] ?? '';
+
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'ID inválido.']);
+            exit;
+        }
+
+        $allowedStatuses = ['pending', 'reviewing', 'interview_scheduled', 'interview_done', 'approved', 'rejected', 'archived'];
+        if (!in_array($newStatus, $allowedStatuses)) {
+            echo json_encode(['success' => false, 'message' => 'Status inválido.']);
+            exit;
+        }
+
+        try {
+            $stmt = $pdo->prepare("UPDATE curriculos SET status = ?, status_updated_at = NOW() WHERE id = ?");
+            $stmt->execute([$newStatus, $id]);
+            logError("Currículo ID: $id atualizado para status: $newStatus", 'INFO');
+            echo json_encode(['success' => true, 'message' => 'Status atualizado com sucesso!']);
+        } catch (Exception $e) {
+            logError("Falha ao atualizar status do currículo ID: $id. Erro: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erro ao atualizar status: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // API para adicionar observação ao currículo
+    if (isset($_POST['action']) && $_POST['action'] === 'addCurriculoNote') {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            echo json_encode(['success' => false, 'message' => 'Erro de validação de segurança (CSRF).']);
+            exit;
+        }
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        $note = trim($_POST['note'] ?? '');
+
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'ID inválido.']);
+            exit;
+        }
+
+        if (empty($note)) {
+            echo json_encode(['success' => false, 'message' => 'A observação não pode estar vazia.']);
+            exit;
+        }
+
+        try {
+            // Append note to existing notes with timestamp
+            $stmt = $pdo->prepare("SELECT notes FROM curriculos WHERE id = ?");
+            $stmt->execute([$id]);
+            $existingNotes = $stmt->fetchColumn();
+
+            $timestamp = date('d/m/Y H:i');
+            $newNote = ($existingNotes ? $existingNotes . "\n\n" : '') . "[$timestamp] $note";
+
+            $stmt = $pdo->prepare("UPDATE curriculos SET notes = ? WHERE id = ?");
+            $stmt->execute([$newNote, $id]);
+            logError("Observação adicionada ao currículo ID: $id", 'INFO');
+            echo json_encode(['success' => true, 'message' => 'Observação adicionada com sucesso!']);
+        } catch (Exception $e) {
+            logError("Falha ao adicionar observação ao currículo ID: $id. Erro: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erro ao adicionar observação: ' . $e->getMessage()]);
         }
         exit;
     }
@@ -528,9 +711,66 @@ $totalCurriculos = $stmt->fetchColumn();
                 <!-- Tab Currículos -->
                 <div id="curriculos-tab" class="tab-content active">
                     <h3><i class="fas fa-list"></i> Currículos Cadastrados</h3>
+
+                    <!-- Filtros e Ações -->
+                    <div class="curriculos-filters">
+                        <div class="filter-group">
+                            <label for="statusFilter">Filtrar por Status:</label>
+                            <select id="statusFilter" onchange="loadCurriculos()">
+                                <option value="all">Todos</option>
+                                <option value="pending">Pendente</option>
+                                <option value="reviewing">Em Análise</option>
+                                <option value="interview_scheduled">Entrevista Agendada</option>
+                                <option value="interview_done">Entrevista Realizada</option>
+                                <option value="approved">Aprovado</option>
+                                <option value="rejected">Reprovado</option>
+                                <option value="archived">Arquivado</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="searchInput">Buscar:</label>
+                            <input type="text" id="searchInput" placeholder="Nome, email, telefone ou cidade..." oninput="loadCurriculos()">
+                        </div>
+                        <div class="filter-actions">
+                            <button onclick="exportCSV()" class="btn-secondary btn-small">
+                                <i class="fas fa-download"></i> Exportar CSV
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Ações em Massa -->
+                    <div id="bulkActions" class="bulk-actions" style="display: none;">
+                        <span id="selectedCount">0 selecionado(s)</span>
+                        <div class="bulk-buttons">
+                            <select id="bulkStatusSelect" class="bulk-status-select">
+                                <option value="">Alterar Status...</option>
+                                <option value="pending">Pendente</option>
+                                <option value="reviewing">Em Análise</option>
+                                <option value="interview_scheduled">Entrevista Agendada</option>
+                                <option value="interview_done">Entrevista Realizada</option>
+                                <option value="approved">Aprovado</option>
+                                <option value="rejected">Reprovado</option>
+                                <option value="archived">Arquivado</option>
+                            </select>
+                            <button onclick="bulkUpdateStatus()" class="btn-primary btn-small">Aplicar</button>
+                            <button onclick="bulkDelete()" class="btn-remove btn-small">Deletar Selecionados</button>
+                        </div>
+                    </div>
+
                     <div class="table-responsive">
                         <table class="curriculos-table">
-                            <thead><tr><th>Data/Hora</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Cidade</th><th>Ações</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                                    <th>Data/Hora</th>
+                                    <th>Nome</th>
+                                    <th>Telefone</th>
+                                    <th>Email</th>
+                                    <th>Cidade</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
                             <tbody id="curriculos-tbody">
                                 <!-- Conteúdo carregado via JS -->
                             </tbody>
@@ -665,28 +905,232 @@ $totalCurriculos = $stmt->fetchColumn();
 
         // Carregar currículos via fetch
         function loadCurriculos() {
-            fetch('admin.php?action=getCurriculos')
+            const statusFilter = document.getElementById('statusFilter').value;
+            const searchQuery = document.getElementById('searchInput').value;
+
+            let url = `admin.php?action=getCurriculos&status=${encodeURIComponent(statusFilter)}&search=${encodeURIComponent(searchQuery)}`;
+
+            fetch(url)
                 .then(res => res.json())
                 .then(data => {
                     const tbody = document.getElementById('curriculos-tbody');
                     if (data.success && data.curriculos.length > 0) {
-                        tbody.innerHTML = data.curriculos.map(c => `
-                            <tr>
-                                <td>${new Date(c.data_cadastro).toLocaleString('pt-BR')}</td>
-                                <td>${c.nome}</td>
-                                <td>${c.telefone}</td>
-                                <td>${c.email || 'N/A'}</td>
-                                <td>${c.cidade}</td>
-                                <td>
-                                    <button class="btn-primary btn-small" onclick="viewCurriculo(${c.id})"><i class="fas fa-eye"></i> Ver</button>
-                                    <button class="btn-remove btn-small" onclick="deleteCurriculo(${c.id}, this)"><i class="fas fa-trash"></i> Deletar</button>
-                                </td>
-                            </tr>
-                        `).join('');
+                        tbody.innerHTML = data.curriculos.map(c => {
+                            const statusClass = `status-${c.status}`;
+                            const statusLabel = {
+                                'pending': 'Pendente',
+                                'reviewing': 'Em Análise',
+                                'interview_scheduled': 'Entrevista Agendada',
+                                'interview_done': 'Entrevista Realizada',
+                                'approved': 'Aprovado',
+                                'rejected': 'Reprovado',
+                                'archived': 'Arquivado'
+                            }[c.status] || c.status;
+
+                            return `
+                                <tr>
+                                    <td><input type="checkbox" class="curriculo-checkbox" value="${c.id}" onchange="updateBulkActions()"></td>
+                                    <td>${new Date(c.data_cadastro).toLocaleString('pt-BR')}</td>
+                                    <td>${c.nome}</td>
+                                    <td>${c.telefone}</td>
+                                    <td>${c.email || 'N/A'}</td>
+                                    <td>${c.cidade}</td>
+                                    <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+                                    <td>
+                                        <button class="btn-primary btn-small" onclick="viewCurriculo(${c.id})" title="Ver"><i class="fas fa-eye"></i></button>
+                                        <button class="btn-secondary btn-small" onclick="quickStatusChange(${c.id})" title="Alterar Status"><i class="fas fa-exchange-alt"></i></button>
+                                        <button class="btn-remove btn-small" onclick="deleteCurriculo(${c.id}, this)" title="Deletar"><i class="fas fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('');
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="6">Nenhum currículo encontrado.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="8">Nenhum currículo encontrado.</td></tr>';
                     }
                 });
+        }
+
+        // Selecionar/Deselecionar todos
+        function toggleSelectAll() {
+            const selectAllCheckbox = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.curriculo-checkbox');
+            checkboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+            updateBulkActions();
+        }
+
+        // Atualizar ações em massa
+        function updateBulkActions() {
+            const checkboxes = document.querySelectorAll('.curriculo-checkbox:checked');
+            const bulkActions = document.getElementById('bulkActions');
+            const selectedCount = document.getElementById('selectedCount');
+
+            if (checkboxes.length > 0) {
+                bulkActions.style.display = 'flex';
+                selectedCount.textContent = `${checkboxes.length} selecionado(s)`;
+            } else {
+                bulkActions.style.display = 'none';
+            }
+        }
+
+        // Alterar status em massa
+        function bulkUpdateStatus() {
+            const statusSelect = document.getElementById('bulkStatusSelect');
+            const newStatus = statusSelect.value;
+
+            if (!newStatus) {
+                alert('Selecione um status.');
+                return;
+            }
+
+            const checkboxes = document.querySelectorAll('.curriculo-checkbox:checked');
+            if (checkboxes.length === 0) {
+                alert('Selecione pelo menos um currículo.');
+                return;
+            }
+
+            if (!confirm(`Deseja alterar o status de ${checkboxes.length} currículo(s) para "${statusSelect.options[statusSelect.selectedIndex].text}"?`)) {
+                return;
+            }
+
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+
+            const promises = Array.from(checkboxes).map(cb => {
+                const formData = new FormData();
+                formData.append('action', 'updateCurriculoStatus');
+                formData.append('id', cb.value);
+                formData.append('status', newStatus);
+                formData.append('csrf_token', csrfToken);
+
+                return fetch('admin.php', { method: 'POST', body: formData })
+                    .then(res => res.json());
+            });
+
+            Promise.all(promises)
+                .then(results => {
+                    const successCount = results.filter(r => r.success).length;
+                    alert(`${successCount} de ${checkboxes.length} currículo(s) atualizado(s) com sucesso!`);
+                    statusSelect.value = '';
+                    document.getElementById('selectAll').checked = false;
+                    updateBulkActions();
+                    loadCurriculos();
+                })
+                .catch(err => alert('Erro ao atualizar status: ' + err));
+        }
+
+        // Deletar em massa
+        function bulkDelete() {
+            const checkboxes = document.querySelectorAll('.curriculo-checkbox:checked');
+            if (checkboxes.length === 0) {
+                alert('Selecione pelo menos um currículo.');
+                return;
+            }
+
+            if (!confirm(`Deseja deletar ${checkboxes.length} currículo(s)? Esta ação não pode ser desfeita.`)) {
+                return;
+            }
+
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+
+            const promises = Array.from(checkboxes).map(cb => {
+                const formData = new FormData();
+                formData.append('action', 'deleteCurriculo');
+                formData.append('id', cb.value);
+                formData.append('csrf_token', csrfToken);
+
+                return fetch('admin.php', { method: 'POST', body: formData })
+                    .then(res => res.json());
+            });
+
+            Promise.all(promises)
+                .then(results => {
+                    const successCount = results.filter(r => r.success).length;
+                    alert(`${successCount} de ${checkboxes.length} currículo(s) deletado(s) com sucesso!`);
+                    document.getElementById('selectAll').checked = false;
+                    updateBulkActions();
+                    loadCurriculos();
+                })
+                .catch(err => alert('Erro ao deletar currículos: ' + err));
+        }
+
+        // Alteração rápida de status
+        function quickStatusChange(id) {
+            const newStatus = prompt(
+                'Digite o novo status:\n\n' +
+                'pending - Pendente\n' +
+                'reviewing - Em Análise\n' +
+                'interview_scheduled - Entrevista Agendada\n' +
+                'interview_done - Entrevista Realizada\n' +
+                'approved - Aprovado\n' +
+                'rejected - Reprovado\n' +
+                'archived - Arquivado'
+            );
+
+            if (!newStatus) return;
+
+            const allowedStatuses = ['pending', 'reviewing', 'interview_scheduled', 'interview_done', 'approved', 'rejected', 'archived'];
+            if (!allowedStatuses.includes(newStatus)) {
+                alert('Status inválido!');
+                return;
+            }
+
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+            const formData = new FormData();
+            formData.append('action', 'updateCurriculoStatus');
+            formData.append('id', id);
+            formData.append('status', newStatus);
+            formData.append('csrf_token', csrfToken);
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Status atualizado com sucesso!');
+                        loadCurriculos();
+                    } else {
+                        alert('Erro: ' + data.message);
+                    }
+                })
+                .catch(err => alert('Erro ao atualizar status: ' + err));
+        }
+
+        // Exportar CSV
+        function exportCSV() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const searchQuery = document.getElementById('searchInput').value;
+            const url = `admin.php?action=exportCurriculosCSV&status=${encodeURIComponent(statusFilter)}&search=${encodeURIComponent(searchQuery)}`;
+            window.location.href = url;
+        }
+
+        // Adicionar observação
+        function addNote(id) {
+            const noteInput = document.getElementById('noteInput');
+            const note = noteInput.value.trim();
+
+            if (!note) {
+                alert('Digite uma observação antes de enviar.');
+                return;
+            }
+
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+            const formData = new FormData();
+            formData.append('action', 'addCurriculoNote');
+            formData.append('id', id);
+            formData.append('note', note);
+            formData.append('csrf_token', csrfToken);
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Observação adicionada com sucesso!');
+                        noteInput.value = '';
+                        // Recarregar detalhes para mostrar a nova observação
+                        viewCurriculo(id);
+                    } else {
+                        alert('Erro: ' + data.message);
+                    }
+                })
+                .catch(err => alert('Erro ao adicionar observação: ' + err));
         }
         
         // Salvar Config API
@@ -861,6 +1305,8 @@ $totalCurriculos = $stmt->fetchColumn();
                             `).join('');
                         }
 
+                        const statusClass = `status-${c.status}`;
+
                         modalBody.innerHTML = `
                             <h3><i class="fas fa-user"></i> Dados Pessoais</h3>
                             <p><strong>Nome:</strong> ${c.nome}</p>
@@ -896,6 +1342,18 @@ $totalCurriculos = $stmt->fetchColumn();
                             <div class="modal-files">
                                 <a href="javascript:void(0);" onclick="showPdfModal('uploads/${c.arquivo_curriculo}')"><i class="fas fa-file-pdf"></i> Ver Currículo (PDF)</a>
                                 <a href="javascript:void(0);" onclick="showImageModal('uploads/${c.arquivo_foto}')"><i class="fas fa-camera"></i> Ver Foto</a>
+                            </div>
+
+                            <h3><i class="fas fa-info-circle"></i> Status do Processo</h3>
+                            <p><strong>Status Atual:</strong> <span class="status-badge ${statusClass}">${c.status_label}</span></p>
+
+                            <h3><i class="fas fa-sticky-note"></i> Observações</h3>
+                            <div class="notes-section">
+                                ${c.notes ? `<div class="notes-content">${c.notes.replace(/\n/g, '<br>')}</div>` : '<p class="no-notes">Nenhuma observação registrada.</p>'}
+                                <div class="add-note-form">
+                                    <textarea id="noteInput" placeholder="Adicionar nova observação..." rows="3"></textarea>
+                                    <button onclick="addNote(${c.id})" class="btn-primary btn-small">Adicionar Observação</button>
+                                </div>
                             </div>
 
                             <hr class="admin-modal-hr">
