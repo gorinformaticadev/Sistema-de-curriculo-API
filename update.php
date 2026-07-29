@@ -199,6 +199,12 @@ if ($action === 'executeUpdate') {
                 continue;
             }
 
+            // Proteger pasta uploads - não sobrescrever a menos que seja explicitamente desejado
+            if (strpos($relativePath, 'uploads/') === 0) {
+                $logs[] = "⚠️ Pasta 'uploads/' preservada (não sobrescrita).";
+                continue;
+            }
+
             if ($file->isDir()) {
                 if (!file_exists($targetPath)) {
                     mkdir($targetPath, 0700, true);
