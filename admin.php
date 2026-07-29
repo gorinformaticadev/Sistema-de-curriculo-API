@@ -309,10 +309,10 @@ if (!isAdmin()) {
     </head>
     <body>
         <div class="container">
-            <div class="login-form" style="max-width: 400px; margin: 100px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+            <div class="login-form admin-login-box">
                 <h2>Área Administrativa</h2>
                 <?php if (isset($error)): ?>
-                    <div class="error-message" style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin-bottom: 15px;"><?php echo $error; ?></div>
+                    <div class="error-message admin-error"><?php echo $error; ?></div>
                 <?php endif; ?>
                 
                 <form method="POST">
@@ -348,8 +348,8 @@ $totalCurriculos = $stmt->fetchColumn();
     <link href="styles.css" rel="stylesheet">
     <style>
         /* Estilos do painel (sem grandes alterações, apenas ajustes) */
-        .tabs { display: flex; border-bottom: 2px solid #e5e7eb; margin-bottom: 20px; flex-wrap: wrap; }
-        .tab { padding: 12px 20px; background: #f9fafb; border: none; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.3s ease; font-size: 0.9rem; }
+        .tabs { display: flex; border-bottom: 2px solid #e5e7eb; margin-bottom: 20px; flex-wrap: wrap; gap: 5px; }
+        .tab { padding: 12px 16px; background: #f9fafb; border: none; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.3s ease; font-size: 0.9rem; flex: 1; min-width: 120px; text-align: center; }
         .tab.active { background: white; border-bottom-color: #1e40af; color: #1e40af; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -364,7 +364,16 @@ $totalCurriculos = $stmt->fetchColumn();
         }
         .btn-small { margin-left: 5px; }
 
-        
+        /* Admin Login Box */
+        .admin-login-box {
+            max-width: 400px;
+            margin: 60px auto;
+            background: white;
+            padding: 30px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
         /* Estilos do Modal */
         .modal {
             display: none;
@@ -376,18 +385,21 @@ $totalCurriculos = $stmt->fetchColumn();
             height: 100%;
             overflow: auto;
             background-color: rgba(0,0,0,0.6);
+            padding: 20px;
         }
         .modal-content {
             background-color: #fefefe;
             margin: 5% auto;
-            padding: 20px 30px;
+            padding: 20px;
             border: 1px solid #888;
-            width: 80%;
+            width: 100%;
             max-width: 800px;
             border-radius: 12px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
             position: relative;
             animation: fadeIn 0.3s;
+            max-height: 85vh;
+            overflow-y: auto;
         }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-20px); }
@@ -397,16 +409,23 @@ $totalCurriculos = $stmt->fetchColumn();
             color: #aaa;
             position: absolute;
             top: 10px;
-            right: 20px;
+            right: 15px;
             font-size: 28px;
             font-weight: bold;
             cursor: pointer;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
         }
-        .modal-close:hover, .modal-close:focus { color: black; text-decoration: none; }
-        #modalBody h3 { border-bottom: 2px solid #1e40af; padding-bottom: 5px; margin-top: 20px; color: #1e40af; }
+        .modal-close:hover, .modal-close:focus { color: black; text-decoration: none; background: #f3f4f6; }
+        #modalBody h3 { border-bottom: 2px solid #1e40af; padding-bottom: 5px; margin-top: 20px; color: #1e40af; font-size: 1.1rem; }
         #modalBody p { margin: 5px 0 15px; line-height: 1.6; }
-        #modalBody strong { display: inline-block; min-width: 180px; color: #333; }
-        .modal-files a { display: inline-block; margin-right: 20px; text-decoration: none; background: #e0f2fe; color: #0c4a6e; padding: 8px 12px; border-radius: 6px; transition: background 0.3s; }
+        #modalBody strong { display: inline-block; min-width: 140px; color: #333; }
+        .modal-files a { display: inline-block; margin-right: 15px; text-decoration: none; background: #e0f2fe; color: #0c4a6e; padding: 8px 12px; border-radius: 6px; transition: background 0.3s; font-size: 0.9rem; }
         .modal-files a:hover { background: #bae6fd; }
         .experience-block {
             border-left: 3px solid #e5e7eb;
@@ -415,25 +434,31 @@ $totalCurriculos = $stmt->fetchColumn();
         }
         .experience-block h4 {
             margin-top: 0;
+            font-size: 1rem;
         }
 
         /* Estilos do Modal de Imagem (Lightbox) */
         .modal-content-image {
             margin: auto;
             display: block;
-            max-width: 90%;
-            max-height: 90vh;
+            max-width: 95%;
+            max-height: 85vh;
             animation: zoomIn 0.3s;
         }
         .image-modal-close {
             position: absolute;
-            top: 15px;
-            right: 35px;
+            top: 10px;
+            right: 20px;
             color: #f1f1f1;
-            font-size: 40px;
+            font-size: 36px;
             font-weight: bold;
             transition: 0.3s;
             cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .image-modal-close:hover,
         .image-modal-close:focus {
@@ -446,8 +471,8 @@ $totalCurriculos = $stmt->fetchColumn();
             margin: 2% auto;
             padding: 0;
             border: 1px solid #888;
-            width: 90%;
-            height: 95vh;
+            width: 95%;
+            height: 90vh;
             max-width: 1000px;
             border-radius: 12px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
@@ -458,12 +483,17 @@ $totalCurriculos = $stmt->fetchColumn();
         .pdf-modal-close {
             position: absolute;
             top: 5px;
-            right: 15px;
+            right: 10px;
             color: #aaa;
             font-size: 28px;
             font-weight: bold;
             cursor: pointer;
             z-index: 10; /* Para ficar sobre o iframe */
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         #pdf-viewer {
             width: 100%;
@@ -498,12 +528,14 @@ $totalCurriculos = $stmt->fetchColumn();
                 <!-- Tab Currículos -->
                 <div id="curriculos-tab" class="tab-content active">
                     <h3><i class="fas fa-list"></i> Currículos Cadastrados</h3>
-                    <table class="curriculos-table">
-                        <thead><tr><th>Data/Hora</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Cidade</th><th>Ações</th></tr></thead>
-                        <tbody id="curriculos-tbody">
-                            <!-- Conteúdo carregado via JS -->
-                        </tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="curriculos-table">
+                            <thead><tr><th>Data/Hora</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Cidade</th><th>Ações</th></tr></thead>
+                            <tbody id="curriculos-tbody">
+                                <!-- Conteúdo carregado via JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Tab Configurações -->
@@ -532,7 +564,7 @@ $totalCurriculos = $stmt->fetchColumn();
                         <div id="configApiSuccess" class="success-message" style="display: none;"></div>
                     </form>
 
-                    <hr style="margin: 40px 0;">
+                    <hr class="admin-hr">
 
                     <form id="credentialsForm" class="config-form">
                         <h3>Credenciais de Acesso</h3>
@@ -568,7 +600,7 @@ $totalCurriculos = $stmt->fetchColumn();
                             <textarea id="testBody" name="body" rows="3" required>Olá! Isto é uma mensagem de teste do sistema de currículos.</textarea>
                         </div>
                         <button type="submit" class="btn-primary"><i class="fas fa-paper-plane"></i> Enviar Mensagem de Teste</button>
-                        <div id="testResult" class="success-message" style="display: none; margin-top: 15px; white-space: pre-wrap; text-align: left;"></div>
+                        <div id="testResult" class="success-message admin-test-result"></div>
                     </form>
                 </div>
 
@@ -576,11 +608,11 @@ $totalCurriculos = $stmt->fetchColumn();
                 <div id="logs-tab" class="tab-content">
                     <div class="form-section">
                         <h3><i class="fas fa-file-alt"></i> Logs do Sistema</h3>
-                        <div style="margin-bottom: 15px;">
+                        <div class="admin-button-group">
                             <button onclick="loadLogs()" class="btn-secondary">
                                 <i class="fas fa-sync-alt"></i> Atualizar Logs
                             </button>
-                            <button onclick="clearLogs()" class="btn-remove" style="background-color: #ef4444;">
+                            <button onclick="clearLogs()" class="btn-remove">
                                 <i class="fas fa-trash"></i> Limpar Logs
                             </button>
                         </div>
@@ -866,7 +898,7 @@ $totalCurriculos = $stmt->fetchColumn();
                                 <a href="javascript:void(0);" onclick="showImageModal('uploads/${c.arquivo_foto}')"><i class="fas fa-camera"></i> Ver Foto</a>
                             </div>
 
-                            <hr style="margin-top: 20px;">
+                            <hr class="admin-modal-hr">
                             <p><small>IP do Cadastro: ${c.ip_cadastro} | Data: ${new Date(c.data_cadastro).toLocaleString('pt-BR')}</small></p>
                         `;
                     } else {
