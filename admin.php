@@ -1160,6 +1160,8 @@ if (isAdmin()) {
             echo json_encode(['success' => false, 'message' => 'Erro ao deletar informação: ' . $e->getMessage()]);
         }
         exit;
+    }
+
     // API para Upload de Atualização (.zip)
     if (isset($_POST['action']) && $_POST['action'] === 'uploadUpdate' && canAccessAction('uploadUpdate')) {
         header('Content-Type: application/json');

@@ -52,7 +52,8 @@ if ($zip->open($zipName, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
             $relativePath === '.env' ||
             $relativePath === 'error.log' ||
             $relativePath === 'access.log' ||
-            $relativePath === 'build_update.php'
+            $relativePath === 'build_update.php' ||
+            $relativePath === 'update_db.php'
         ) {
             continue;
         }

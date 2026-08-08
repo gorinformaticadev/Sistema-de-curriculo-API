@@ -51,3 +51,4 @@ Thumbs.db
 # ============================================
 /vendor/
 composer.lock
+builds/update_v1.2.0.zip
