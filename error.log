@@ -21,3 +21,4 @@
 [2025-07-01 18:48:02] [ERROR] [IP: ::1] DB_CONNECT_FAILURE: Falha na conexão com o banco de dados: SQLSTATE[HY000] [1049] Unknown database 'curriculos_db'
 [2025-07-01 18:48:08] [ERROR] [IP: ::1] DB_CONNECT_FAILURE: Falha na conexão com o banco de dados: SQLSTATE[HY000] [1049] Unknown database 'curriculos_db'
 [2025-07-01 18:48:09] [ERROR] [IP: ::1] DB_CONNECT_FAILURE: Falha na conexão com o banco de dados: SQLSTATE[HY000] [1049] Unknown database 'curriculos_db'
+[2026-08-08 13:54:14] [ERROR] [IP: ::1] DB_CONNECT_FAILURE: Falha na conexão com o banco de dados: SQLSTATE[HY000] [1049] Unknown database 'caurri'
