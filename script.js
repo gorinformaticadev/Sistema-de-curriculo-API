@@ -101,6 +101,9 @@ function initializeEventListeners() {
     newRegistrationBtn.addEventListener('click', () => {
         document.getElementById('successMessage').style.display = 'none';
         document.getElementById('mainForm').style.display = 'block';
+        // Remover aviso de confirmação anterior
+        const oldWarning = document.getElementById('confirmationWarning');
+        if (oldWarning) oldWarning.remove();
         curriculumForm.reset();
         resetFormSections();
         resetDynamicFields();
@@ -1373,8 +1376,26 @@ function sendCurriculum(formData, name, resumeFile, photoFile) {
             }
 
             // Show success message
-            document.getElementById('successText').textContent = 
+            const successTextEl = document.getElementById('successText');
+            successTextEl.textContent = 
                 `${name}, seu currículo foi cadastrado com sucesso e será analisado pela nossa equipe de RH.`;
+            
+            // Aviso informativo: confirmação via WhatsApp não enviada (não é erro)
+            const oldWarning = document.getElementById('confirmationWarning');
+            if (oldWarning) oldWarning.remove();
+            if (data.notification_warning) {
+                const warningDiv = document.createElement('div');
+                warningDiv.id = 'confirmationWarning';
+                warningDiv.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px 15px;margin-top:20px;color:#92400e;font-size:0.95rem;text-align:left;';
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-exclamation-triangle';
+                warningDiv.appendChild(icon);
+                warningDiv.appendChild(document.createTextNode(' '));
+                const msgSpan = document.createElement('span');
+                msgSpan.textContent = data.notification_warning;
+                warningDiv.appendChild(msgSpan);
+                successTextEl.insertAdjacentElement('afterend', warningDiv);
+            }
             
             document.getElementById('mainForm').style.display = 'none';
             document.getElementById('successMessage').style.display = 'flex';

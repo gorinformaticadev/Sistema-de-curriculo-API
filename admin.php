@@ -1329,18 +1329,96 @@ if (isAdmin()) {
             
             copyUpdateFilesRecursive($sourceDir, $baseDir, $baseDir);
 
-            // 3. Atualizar Banco de Dados se necessário
+            // 3. Atualizar Banco de Dados
+            $dbMessages = [];
+
+            // 3.1 Executar update.sql se existir no pacote (instruções separadas por ;)
             if (file_exists($sourceDir . 'update.sql')) {
                 $sql = file_get_contents($sourceDir . 'update.sql');
                 if (!empty(trim($sql))) {
                     try {
-                        $pdo->exec($sql);
-                        logError("Banco de dados atualizado com sucesso.", "INFO");
+                        $statements = array_values(array_filter(array_map('trim', explode(';', $sql))));
+                        $executadas = 0;
+                        foreach ($statements as $statement) {
+                            $pdo->exec($statement);
+                            $executadas++;
+                        }
+                        $dbMessages[] = "update.sql executado ({$executadas} instruções)";
+                        logError("update.sql executado com sucesso ({$executadas} instruções).", 'INFO');
                     } catch (PDOException $e) {
-                        logError("Erro ao rodar update.sql: " . $e->getMessage(), "ERROR");
-                        // Continua mesmo com erro, mas avisa
+                        $dbMessages[] = 'update.sql com erro';
+                        logError('Erro ao rodar update.sql: ' . $e->getMessage(), 'ERROR');
                     }
                 }
+            }
+
+            // 3.2 Executar migrações pendentes do sistema de migração versionada
+            //     (em processo separado para garantir a versão nova do includes/migration.php)
+            $migrationsApplied = 0;
+            $migrationsMessage = 'banco já atualizado';
+            if (function_exists('curl_init')) {
+                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                $basePath = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+                $basePath = rtrim($basePath, '/');
+                $migrationUrl = $protocol . '://' . $host . $basePath . '/run_migrations.php';
+
+                $ch = curl_init($migrationUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => ['key' => 'internal'],
+                    CURLOPT_TIMEOUT => 120,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => false
+                ]);
+                $migrationResponse = curl_exec($ch);
+                $curlError = curl_error($ch);
+                curl_close($ch);
+
+                if ($migrationResponse !== false) {
+                    $migrationData = json_decode($migrationResponse, true);
+                    if (is_array($migrationData) && !empty($migrationData['success'])) {
+                        $migrationsApplied = count($migrationData['applied_migrations'] ?? []);
+                        $migrationsMessage = $migrationsApplied > 0
+                            ? "{$migrationsApplied} migração(ões) aplicada(s)"
+                            : 'banco já atualizado';
+                        $dbMessages[] = $migrationsMessage;
+                        logError('Migrações executadas na instalação: ' . $migrationsMessage, 'INFO');
+                    } else {
+                        $errDetail = is_array($migrationData) && !empty($migrationData['errors'])
+                            ? implode('; ', $migrationData['errors'])
+                            : $migrationResponse;
+                        $dbMessages[] = 'migrações com erro';
+                        logError('Erro nas migrações durante a instalação: ' . $errDetail, 'ERROR');
+                    }
+                } else {
+                    $dbMessages[] = 'migrações: falha de conexão interna';
+                    logError('Falha ao chamar run_migrations.php: ' . $curlError, 'ERROR');
+                }
+            } elseif (class_exists('DatabaseMigration') && method_exists('DatabaseMigration', 'hasPendingMigrations')) {
+                // Fallback in-processo (somente se a classe nova já estiver carregada)
+                try {
+                    $migration = new DatabaseMigration($pdo);
+                    if ($migration->hasPendingMigrations()) {
+                        $migrationResult = $migration->migrate();
+                        if (!empty($migrationResult['success'])) {
+                            $migrationsApplied = count($migrationResult['applied_migrations']);
+                            $dbMessages[] = $migrationsApplied > 0 ? "{$migrationsApplied} migração(ões) aplicada(s)" : 'banco já atualizado';
+                        } else {
+                            $dbMessages[] = 'migrações com erro';
+                            logError('Erro nas migrações: ' . implode(', ', $migrationResult['errors']), 'ERROR');
+                        }
+                    } else {
+                        $dbMessages[] = 'banco já atualizado';
+                    }
+                } catch (Exception $migrationError) {
+                    $dbMessages[] = 'migrações com erro';
+                    logError('Erro ao executar migrações: ' . $migrationError->getMessage(), 'ERROR');
+                }
+            } else {
+                $dbMessages[] = 'migrações não verificadas (curl indisponível)';
+                logError('Migrações não executadas na instalação: curl indisponível e classe não carregada.', 'ERROR');
             }
 
             // 4. Limpar temporários
@@ -1358,8 +1436,10 @@ if (isAdmin()) {
             deleteDir($tempExtractDir);
             @unlink($baseDir . '/uploads/temp_update.zip');
 
+            $dbSummary = !empty($dbMessages) ? ' Banco de dados: ' . implode(' | ', $dbMessages) . '.' : '';
+
             logError("Sistema atualizado com sucesso por {$_SESSION['user_email']}", 'INFO');
-            echo json_encode(['success' => true, 'message' => 'Sistema atualizado com sucesso! O backup foi salvo em /backups.']);
+            echo json_encode(['success' => true, 'message' => 'Sistema atualizado com sucesso! O backup foi salvo em /backups.' . $dbSummary]);
 
         } catch (Exception $e) {
             logError('Erro durante a atualização: ' . $e->getMessage());

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
 // Buffer de saída para evitar que HTML/warnings corrompam a resposta JSON
 ob_start();
 
@@ -336,19 +336,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
 
         // Enviar mensagem de conclusão para números WhatsApp do usuário
-        if (!empty($config['api_token']) && !empty($config['api_url']) && !empty($config['completion_message'])) {
-            $completionMessage = str_replace('{nome}', $formData['name'], $config['completion_message']);
-            foreach ($phones_clean as $index => $phone) {
-                if ($whatsapps[$index] === 'Sim') {
-                    // Adicionar código do país se não tiver
-                    if (!str_starts_with($phone, '55')) {
-                        $phone = '55' . $phone;
-                    }
-                    $success = sendApiTextMessage($config['api_token'], $config['api_url'], $phone, $completionMessage);
-                    if (!$success) {
-                        logError("Falha ao enviar mensagem de conclusão para $phone", 'WARNING');
+        // (falha aqui NÃO invalida o cadastro: apenas aviso informativo)
+        $confirmacaoEnviada = true; // sem número WhatsApp informado, nada a enviar
+        $possuiNumeroWhatsApp = false;
+        foreach ($whatsapps as $wa) {
+            if ($wa === 'Sim') { $possuiNumeroWhatsApp = true; break; }
+        }
+        if ($possuiNumeroWhatsApp) {
+            $confirmacaoEnviada = false;
+            if (!empty($config['api_token']) && !empty($config['api_url']) && !empty($config['completion_message'])) {
+                $completionMessage = str_replace('{nome}', $formData['name'], $config['completion_message']);
+                foreach ($phones_clean as $index => $phone) {
+                    if ($whatsapps[$index] === 'Sim') {
+                        // Adicionar código do país se não tiver
+                        if (!str_starts_with($phone, '55')) {
+                            $phone = '55' . $phone;
+                        }
+                        $success = sendApiTextMessage($config['api_token'], $config['api_url'], $phone, $completionMessage);
+                        if ($success) {
+                            $confirmacaoEnviada = true;
+                        } else {
+                            logError("Falha ao enviar mensagem de conclusão para $phone", 'WARNING');
+                        }
                     }
                 }
+            } else {
+                logError('API de WhatsApp não configurada. Mensagem de conclusão não enviada.', 'WARNING');
             }
         }
 
@@ -471,10 +484,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 logError("Falha ao enviar a foto via API. Continuando...", 'WARNING');
             }
 
-            // Enviar TEXTO com dados depois
+            // Enviar TEXTO com dados depois (falha NÃO invalida o cadastro)
             $textSuccess = sendApiTextMessage($config['api_token'], $config['api_url'], $config['notification_number'], trim($textMessage));
             if (!$textSuccess) {
-                throw new Exception("Falha ao enviar notificação de texto via API. Verifique os logs.");
+                logError("Falha ao enviar notificação de texto via API. Currículo já salvo — apenas aviso interno.", 'WARNING');
             }
 
             // Enviar PDF do curriculo por ultimo
@@ -504,7 +517,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             logError("Email remetente ou destinatário não configurado. Notificação por email pulada.", 'WARNING');
         }
 
-        sendJson(['success' => true, 'message' => 'Currículo cadastrado com sucesso!']);
+        // Cadastro SEMPRE retorna sucesso (já está salvo no banco).
+        // Se a confirmação via WhatsApp não foi enviada, avisa de forma informativa.
+        if ($confirmacaoEnviada) {
+            sendJson(['success' => true, 'message' => 'Currículo cadastrado com sucesso!']);
+        } else {
+            sendJson([
+                'success' => true,
+                'message' => 'Currículo cadastrado com sucesso!',
+                'notification_warning' => 'Não foi possível enviar a mensagem de confirmação para o seu WhatsApp. Caso queira confirmar o envio do seu currículo, entre em contato conosco pelo WhatsApp (61) 3359-7358.'
+            ]);
+        }
 
     } catch (Exception $e) {
         logError("ERRO NO PROCESSAMENTO: " . $e->getMessage());

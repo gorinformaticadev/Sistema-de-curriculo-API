@@ -1,1 +1,1 @@
-gerar_update 1.2.0 "Update"
+gerar_update 1.3.0 "Update"
