@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
 // Buffer de saída para evitar que HTML/warnings corrompam a resposta JSON
 ob_start();
 
@@ -127,7 +127,7 @@ function uploadFile($file, $allowedTypes, $prefix = '') {
     return $fileName;
 }
 
-// --- FUNÇÕES DA API (Pluggor - somente texto) ---
+// --- FUNÇÕES DA API (Pluggor) ---
 
 /**
  * Envia mensagem de texto via API Pluggor.
@@ -183,13 +183,15 @@ function sendApiTextMessage($token, $url, $number, $message) {
 }
 
 /**
- * Envia mídia (foto/currículo) via API.
- * Mantido para o envio de mídia do Pluggor.
- * Formato multipart: {number, medias}
- * number: somente dígitos (8 a 15) com DDI + DDD
- * Sucesso: HTTP 200
+ * Envia mídia (foto/currículo) via API Pluggor.
+ * POST /api/messages/send-media com multipart/form-data.
+ * Campos: number, file, caption (opcional).
+ * O tipo da mídia é identificado automaticamente pelo conteúdo.
+ * Imagens: PNG, JPEG, GIF, WEBP | Documentos: PDF, DOCX, XLSX
+ * Limite de 10 MB por arquivo.
+ * Sucesso: HTTP 200 com {"success":true,"messageId":"..."}
  */
-function sendApiMediaMessage($token, $url, $number, $filePath, $fileName) {
+function sendApiMediaMessage($token, $url, $number, $filePath, $fileName, $caption = '') {
     // Validação do número: somente dígitos, 8 a 15 caracteres (com DDI + DDD)
     if (!preg_match('/^\d{8,15}$/', $number)) {
         logError("API (Media): Número de telefone inválido: $number");
@@ -200,9 +202,35 @@ function sendApiMediaMessage($token, $url, $number, $filePath, $fileName) {
         return false;
     }
 
+    // Tipos suportados pela API Pluggor (identificados pelo conteúdo)
+    $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+    $allowedMedia = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'docx', 'xlsx'];
+    if (!in_array($extension, $allowedMedia, true)) {
+        logError("API (Media): Tipo não suportado pela API Pluggor (.$extension) para $fileName. Envio de mídia ignorado — arquivo segue salvo na plataforma.", 'WARNING');
+        return false;
+    }
+
+    // Limite de 10 MB por arquivo
+    if (filesize($filePath) > 10 * 1024 * 1024) {
+        logError("API (Media): Arquivo $fileName excede 10MB. Envio de mídia ignorado — arquivo segue salvo na plataforma.", 'WARNING');
+        return false;
+    }
+
+    // Endpoint de mídia derivado da URL configurada: /api/messages/send-media
+    $mediaUrl = str_replace('/messages/send', '/messages/send-media', $url);
+    if ($mediaUrl === $url) {
+        // Fallback: se a URL não contém o caminho padrão, concatena
+        $mediaUrl = rtrim($url, '/') . '/api/messages/send-media';
+    }
+
+    // multipart: number + file + caption (o tipo é detectado pelo conteúdo)
     $cFile = new CURLFile($filePath, mime_content_type($filePath), $fileName);
-    $data = ['number' => $number, 'medias' => $cFile];
-    $ch = curl_init($url);
+    $data = [
+        'number' => $number,
+        'file' => $cFile,
+        'caption' => $caption
+    ];
+    $ch = curl_init($mediaUrl);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
