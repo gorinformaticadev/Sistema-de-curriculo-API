@@ -36,7 +36,7 @@ $config = loadConfigFromDB($pdo);
 // Garantir que configurações padrão existam
 $defaultConfigs = [
     'api_token' => '',
-    'api_url' => 'https://app.whapichat.com.br:443/backend/api/messages/send',
+    'api_url' => 'https://app.pluggor.com.br/api/messages/send',
     'notification_number' => '5500000000000',
     'completion_message' => 'Olá {nome}! Obrigado por se cadastrar no nosso sistema. Seu currículo foi recebido com sucesso e entraremos em contato em breve.',
     'smtp_host' => 'smtp.gmail.com',
@@ -340,7 +340,7 @@ if (isAdmin()) {
             exit;
         }
 
-        $data = ['number' => $number, 'body' => $body, 'saveOnTicket' => true];
+        $data = ['number' => $number, 'body' => $body];
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
@@ -921,8 +921,7 @@ if (isAdmin()) {
 
             $data = [
                 'number' => $numeroLimpo,
-                'body' => $mensagem,
-                'saveOnTicket' => true
+                'body' => $mensagem
             ];
 
             $ch = curl_init($url);

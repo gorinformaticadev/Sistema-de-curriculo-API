@@ -156,8 +156,7 @@ function apiTestApiConfig($pdo, $configData) {
     try {
         $data = [
             'number' => $number, 
-            'body' => $body, 
-            'saveOnTicket' => true
+            'body' => $body
         ];
         
         $ch = curl_init($url);
@@ -256,7 +255,7 @@ function apiResetConfig($pdo) {
     
     try {
         $defaultConfigs = [
-            'api_url' => 'https://app.whapichat.com.br:443/backend/api/messages/send',
+            'api_url' => 'https://app.pluggor.com.br/api/messages/send',
             'notification_number' => '5500000000000',
             'completion_message' => 'Olá {nome}! Obrigado por se cadastrar no nosso sistema. Seu currículo foi recebido com sucesso e entraremos em contato em breve.',
             'smtp_host' => 'smtp.gmail.com',

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
 // Buffer de saída para evitar que HTML/warnings corrompam a resposta JSON
 ob_start();
 
@@ -127,16 +127,30 @@ function uploadFile($file, $allowedTypes, $prefix = '') {
     return $fileName;
 }
 
-// --- FUNÇÕES DA API ---
+// --- FUNÇÕES DA API (Pluggor - somente texto) ---
 
+/**
+ * Envia mensagem de texto via API Pluggor.
+ * POST {number, body} | Authorization: Bearer <token>
+ * number: somente dígitos (8 a 15) com DDI + DDD
+ * body: 1 a 4096 caracteres
+ * Sucesso: HTTP 200 com {"success":true,"messageId":"..."}
+ */
 function sendApiTextMessage($token, $url, $number, $message) {
-    // Validação básica do número
-    if (strlen($number) < 12 || !str_starts_with($number, '55')) {
+    // Validação do número: somente dígitos, 8 a 15 caracteres (com DDI + DDD)
+    if (!preg_match('/^\d{8,15}$/', $number)) {
         logError("API (Texto): Número de telefone inválido: $number");
         return false;
     }
 
-    $data = ['number' => $number, 'body' => $message, 'saveOnTicket' => true];
+    // Validação do corpo: 1 a 4096 caracteres
+    $bodyLength = strlen($message);
+    if ($bodyLength < 1 || $bodyLength > 4096) {
+        logError("API (Texto): Mensagem com tamanho inválido ($bodyLength caracteres).");
+        return false;
+    }
+
+    $data = ['number' => $number, 'body' => $message];
     logError("API (Texto): Preparando para enviar JSON: " . json_encode($data), 'INFO');
 
     $ch = curl_init($url);
@@ -144,18 +158,40 @@ function sendApiTextMessage($token, $url, $number, $message) {
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => json_encode($data),
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $token]
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $token],
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_CONNECTTIMEOUT => 10
     ]);
     $response = curl_exec($ch);
     $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
-    if ($httpcode !== 200) logError("API (Texto): Falha. Status: $httpcode, Resposta: $response");
-    return $httpcode === 200;
+
+    if ($httpcode === 200) {
+        return true;
+    }
+
+    // Mapear erros conhecidos da API Pluggor para o log
+    $errorDetail = '';
+    $responseData = json_decode($response, true);
+    if (is_array($responseData) && !empty($responseData['error'])) {
+        $errorDetail = $responseData['error'];
+        if (is_array($errorDetail)) { $errorDetail = json_encode($errorDetail); }
+    }
+    logError("API (Texto): Falha. Status: $httpcode, Erro: $errorDetail, Curl: $curlError, Resposta: " . substr((string)$response, 0, 500));
+    return false;
 }
 
+/**
+ * Envia mídia (foto/currículo) via API.
+ * Mantido para o envio de mídia do Pluggor.
+ * Formato multipart: {number, medias}
+ * number: somente dígitos (8 a 15) com DDI + DDD
+ * Sucesso: HTTP 200
+ */
 function sendApiMediaMessage($token, $url, $number, $filePath, $fileName) {
-    // Validação básica do número
-    if (strlen($number) < 12 || !str_starts_with($number, '55')) {
+    // Validação do número: somente dígitos, 8 a 15 caracteres (com DDI + DDD)
+    if (!preg_match('/^\d{8,15}$/', $number)) {
         logError("API (Media): Número de telefone inválido: $number");
         return false;
     }
@@ -165,19 +201,33 @@ function sendApiMediaMessage($token, $url, $number, $filePath, $fileName) {
     }
 
     $cFile = new CURLFile($filePath, mime_content_type($filePath), $fileName);
-    $data = ['number' => $number, 'medias' => $cFile, 'saveOnTicket' => true];
+    $data = ['number' => $number, 'medias' => $cFile];
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => $data,
-        CURLOPT_HTTPHEADER => ['Content-Type: multipart/form-data', 'Authorization: Bearer ' . $token]
+        CURLOPT_HTTPHEADER => ['Content-Type: multipart/form-data', 'Authorization: Bearer ' . $token],
+        CURLOPT_TIMEOUT => 60,
+        CURLOPT_CONNECTTIMEOUT => 10
     ]);
     $response = curl_exec($ch);
     $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
-    if ($httpcode !== 200) logError("API (Media): Falha ao enviar $fileName. Status: $httpcode, Resposta: $response");
-    return $httpcode === 200;
+
+    if ($httpcode === 200) {
+        return true;
+    }
+
+    $errorDetail = '';
+    $responseData = json_decode($response, true);
+    if (is_array($responseData) && !empty($responseData['error'])) {
+        $errorDetail = $responseData['error'];
+        if (is_array($errorDetail)) { $errorDetail = json_encode($errorDetail); }
+    }
+    logError("API (Media): Falha ao enviar $fileName. Status: $httpcode, Erro: $errorDetail, Curl: $curlError, Resposta: " . substr((string)$response, 0, 500));
+    return false;
 }
 
 
@@ -507,6 +557,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $textMessage .= "*Detalhe:* " . $formData['comoConheceuOutro'] . "\n";
             }
             $referenciasArray = json_decode($formData['referencias'], true) ?: [];
+            $textMessage .= "*Possui referência profissional:* " . (!empty($referenciasArray) ? 'Sim' : 'Não') . "\n";
             if (!empty($referenciasArray)) {
                 foreach ($referenciasArray as $i => $ref) {
                     $textMessage .= "*Referência " . ($i + 1) . ":* " . ($ref['nome'] ?? '') . " - " . ($ref['empresa'] ?? '') . " - " . ($ref['cargo'] ?? '') . " - " . ($ref['telefone'] ?? '') . "\n";
