@@ -601,7 +601,8 @@ body {
 
 .conditional-section.show {
     opacity: 1;
-    max-height: 2000px;
+    /* Alto o bastante para múltiplas experiências (10+ cards) sem cortar conteúdo */
+    max-height: 20000px;
     margin-top: 20px;
 }
 
