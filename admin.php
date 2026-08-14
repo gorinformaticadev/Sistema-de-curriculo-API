@@ -355,8 +355,10 @@ if (isAdmin()) {
 
         logError("Teste de API: Status $httpcode, Resposta: $response", 'INFO');
 
+        // A API Pluggor responde 200 ou 201 (Created) em caso de sucesso
+        $envioOk = ($httpcode >= 200 && $httpcode < 300);
         echo json_encode([
-            'success' => $httpcode === 200,
+            'success' => $envioOk,
             'message' => "Status: $httpcode\nResposta: " . htmlspecialchars($response)
         ]);
         exit;
@@ -939,7 +941,7 @@ if (isAdmin()) {
             $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
-            $statusEnvio = ($httpcode === 200) ? 'enviado' : 'erro';
+            $statusEnvio = ($httpcode >= 200 && $httpcode < 300) ? 'enviado' : 'erro';
 
             // Salvar no histórico
             $stmt = $pdo->prepare("

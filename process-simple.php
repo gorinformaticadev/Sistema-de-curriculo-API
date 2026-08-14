@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
 // Buffer de saída para evitar que HTML/warnings corrompam a resposta JSON
 ob_start();
 
@@ -134,7 +134,7 @@ function uploadFile($file, $allowedTypes, $prefix = '') {
  * POST {number, body} | Authorization: Bearer <token>
  * number: somente dígitos (8 a 15) com DDI + DDD
  * body: 1 a 4096 caracteres
- * Sucesso: HTTP 200 com {"success":true,"messageId":"..."}
+ * Sucesso: HTTP 200/201 com {"success":true,"messageId":"..."}
  */
 function sendApiTextMessage($token, $url, $number, $message) {
     // Validação do número: somente dígitos, 8 a 15 caracteres (com DDI + DDD)
@@ -167,7 +167,8 @@ function sendApiTextMessage($token, $url, $number, $message) {
     $curlError = curl_error($ch);
     curl_close($ch);
 
-    if ($httpcode === 200) {
+    // A API Pluggor responde 200 ou 201 (Created) em caso de sucesso
+    if ($httpcode >= 200 && $httpcode < 300) {
         return true;
     }
 
@@ -189,7 +190,7 @@ function sendApiTextMessage($token, $url, $number, $message) {
  * O tipo da mídia é identificado automaticamente pelo conteúdo.
  * Imagens: PNG, JPEG, GIF, WEBP | Documentos: PDF, DOCX, XLSX
  * Limite de 10 MB por arquivo.
- * Sucesso: HTTP 200 com {"success":true,"messageId":"..."}
+ * Sucesso: HTTP 200/201 com {"success":true,"messageId":"..."}
  */
 function sendApiMediaMessage($token, $url, $number, $filePath, $fileName, $caption = '') {
     // Validação do número: somente dígitos, 8 a 15 caracteres (com DDI + DDD)
@@ -244,7 +245,8 @@ function sendApiMediaMessage($token, $url, $number, $filePath, $fileName, $capti
     $curlError = curl_error($ch);
     curl_close($ch);
 
-    if ($httpcode === 200) {
+    // A API Pluggor responde 200 ou 201 (Created) em caso de sucesso
+    if ($httpcode >= 200 && $httpcode < 300) {
         return true;
     }
 

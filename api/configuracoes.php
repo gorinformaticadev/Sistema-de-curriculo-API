@@ -177,7 +177,8 @@ function apiTestApiConfig($pdo, $configData) {
         $curlError = curl_error($ch);
         curl_close($ch);
         
-        $status = $httpcode === 200;
+        // A API Pluggor responde 200 ou 201 (Created) em caso de sucesso
+        $status = ($httpcode >= 200 && $httpcode < 300);
         $message = "Status HTTP: $httpcode\n";
         
         if ($curlError) {
