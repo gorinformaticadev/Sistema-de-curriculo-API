@@ -1945,6 +1945,18 @@ $totalCurriculos = $stmt->fetchColumn();
 
         <div class="admin-panel">
             <div class="panel-content">
+                <?php
+                // Aviso visível quando a API de envio (Pluggor) não está configurada
+                $apiWarning = '';
+                if (empty($config['api_token']) || empty($config['api_url'])) {
+                    $apiWarning = 'A API de envio (Pluggor) não está configurada (token/URL ausentes). Novos currículos NÃO enviarão notificação no WhatsApp — nem texto, nem foto, nem PDF. Configure na aba "Configurações".';
+                } elseif (empty($config['notification_number']) || in_array($config['notification_number'], ['5500000000000', '5561999999999'], true)) {
+                    $apiWarning = 'O número de notificação do WhatsApp é o padrão de exemplo. A notificação de novos currículos (texto, foto e PDF) pode não chegar. Configure o número real na aba "Configurações".';
+                }
+                if ($apiWarning !== '' && (getUserType() === 'admin')) {
+                    echo '<div style="background:#fef3c7;border:1px solid #f59e0b;border-left:5px solid #f59e0b;border-radius:8px;padding:14px 18px;margin-bottom:20px;color:#92400e;font-size:0.95rem;line-height:1.5;"><i class="fas fa-exclamation-triangle"></i> <strong>Atenção:</strong> ' . htmlspecialchars($apiWarning) . '</div>';
+                }
+                ?>
                 <?php if (getUserType() === 'admin' || getUserType() === 'analisador'): ?>
                 <div class="stats-card">
                     <div class="stat"><h3>Currículos Recebidos</h3><p class="stat-number"><?php echo $totalCurriculos; ?></p></div>
