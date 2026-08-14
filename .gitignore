@@ -53,3 +53,4 @@ Thumbs.db
 composer.lock
 builds/update_v1.2.0.zip
 /builds
+/manifest.json
