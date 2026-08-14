@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
 // Buffer de saída para evitar que HTML/warnings corrompam a resposta JSON
 ob_start();
 
@@ -52,6 +52,52 @@ function loadConfigFromDB($pdo) {
 }
 
 // --- FUNÇÕES DE PROCESSAMENTO ---
+
+/**
+ * AUTO-REPARO: garante que todas as colunas novas da tabela curriculos
+ * existam antes do INSERT. Se o banco estiver desatualizado (migrações
+ * não executadas), adiciona as colunas faltantes na hora.
+ */
+function ensureCurriculosColumns($pdo) {
+    $columns = [
+        'possui_filhos' => "TINYINT(1) DEFAULT 0",
+        'disponibilidade_inicio' => "VARCHAR(50) DEFAULT NULL",
+        'disponibilidade_outra_data' => "DATE DEFAULT NULL",
+        'disponibilidade_sabados' => "VARCHAR(50) DEFAULT NULL",
+        'disponibilidade_horas_extras' => "VARCHAR(50) DEFAULT NULL",
+        'pretensao_salarial' => "VARCHAR(50) DEFAULT NULL",
+        'habilidades' => "TEXT DEFAULT NULL",
+        'conhecimento_informatica' => "VARCHAR(50) DEFAULT NULL",
+        'expectativa_primeiro_emprego' => "TEXT DEFAULT NULL",
+        'curso_atual' => "VARCHAR(255) DEFAULT NULL",
+        'instituicao_curso' => "VARCHAR(255) DEFAULT NULL",
+        'situacao_curso' => "VARCHAR(20) DEFAULT NULL",
+        'ano_conclusao_curso' => "VARCHAR(10) DEFAULT NULL",
+        'como_conheceu' => "VARCHAR(50) DEFAULT NULL",
+        'como_conheceu_outro' => "VARCHAR(255) DEFAULT NULL",
+        'referencias' => "TEXT DEFAULT NULL",
+        'consentimento_lgpd' => "TINYINT(1) DEFAULT 0",
+        'consentimento_banco_talentos' => "TINYINT(1) DEFAULT 0"
+    ];
+    
+    foreach ($columns as $column => $definition) {
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM information_schema.columns
+                 WHERE table_schema = DATABASE()
+                 AND table_name = 'curriculos'
+                 AND column_name = ?"
+            );
+            $stmt->execute([$column]);
+            if ((int)$stmt->fetchColumn() === 0) {
+                $pdo->exec("ALTER TABLE curriculos ADD COLUMN `{$column}` {$definition}");
+                logError("AUTO_REPAIR: Coluna '{$column}' adicionada à tabela curriculos.", 'WARNING');
+            }
+        } catch (Exception $e) {
+            logError("AUTO_REPAIR: Falha ao garantir coluna '{$column}': " . $e->getMessage(), 'ERROR');
+        }
+    }
+}
 
 function sanitizeInput($data) {
     return htmlspecialchars(strip_tags(trim($data)));
@@ -286,6 +332,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 logError('DUPLICATE_WARNING: Curriculo possivelmente duplicado para ' . $formData['name'] . ' (envio permitido apos aviso ao candidato)', 'WARNING');
             }
         }
+
+        // --- AUTO-REPARO DA ESTRUTURA DO BANCO ---
+        // Garante que as colunas novas existam antes do INSERT,
+        // mesmo se as migrações ainda não tiverem sido aplicadas.
+        ensureCurriculosColumns($pdo);
 
         // Inserir no banco de dados
         $sql = "INSERT INTO curriculos (nome, data_nascimento, estado_civil, possui_filhos, telefone, is_whatsapp, email, facebook, instagram, endereco, cidade, estado, escolaridade, estudando, periodo_estudo, possui_cursos, cursos, possui_experiencia, experiencias, motivacao, arquivo_curriculo, arquivo_foto, ip_cadastro, disponibilidade_inicio, disponibilidade_outra_data, disponibilidade_sabados, disponibilidade_horas_extras, pretensao_salarial, habilidades, conhecimento_informatica, expectativa_primeiro_emprego, curso_atual, instituicao_curso, situacao_curso, ano_conclusao_curso, como_conheceu, como_conheceu_outro, referencias, consentimento_lgpd, consentimento_banco_talentos) 
