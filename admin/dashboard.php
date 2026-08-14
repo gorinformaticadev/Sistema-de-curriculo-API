@@ -245,6 +245,71 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Modal de Detalhes do Currículo */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal-container {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 25px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            color: #1e40af;
+            font-size: 1.3rem;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 2rem;
+            cursor: pointer;
+            color: #6b7280;
+            line-height: 1;
+        }
+        
+        .modal-close:hover { color: #dc2626; }
+        
+        .modal-body {
+            padding: 20px 25px;
+        }
+        
+        .modal-body h3 {
+            color: #1e40af;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 6px;
+            margin: 20px 0 10px 0;
+        }
+        
+        .modal-body h3:first-child { margin-top: 0; }
+        
+        .modal-body p {
+            margin: 4px 0;
+            line-height: 1.6;
+        }
     </style>
 </head>
 <body class="admin-dashboard">
@@ -421,6 +486,17 @@
         </div>
     </div>
 
+    <!-- Modal de Detalhes do Currículo -->
+    <div id="curriculoModal" class="modal-overlay" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2><i class="fas fa-file-alt"></i> Detalhes do Currículo</h2>
+                <button class="modal-close" onclick="document.getElementById('curriculoModal').style.display='none'">&times;</button>
+            </div>
+            <div id="modalBody" class="modal-body" style="max-height: 70vh; overflow-y: auto;"></div>
+        </div>
+    </div>
+
     <script>
         // Variáveis globais
         const userType = '<?php echo getUserType(); ?>';
@@ -568,6 +644,148 @@
 
         // Outras funções de carregamento seguem o mesmo padrão...
         // (implementar conforme necessário)
+
+        // ============================================
+        // MODAL DE DETALHES DO CURRÍCULO (todos os dados)
+        // ============================================
+        function viewCurriculo(id) {
+            const modal = document.getElementById('curriculoModal');
+            const modalBody = document.getElementById('modalBody');
+            modalBody.innerHTML = '<p>Carregando detalhes...</p>';
+            modal.style.display = 'flex';
+
+            fetch('admin.php?action=getCurriculoDetails&id=' + id)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success) {
+                        modalBody.innerHTML = '<p class="error-message">' + data.message + '</p>';
+                        return;
+                    }
+                    const c = data.curriculo;
+
+                    // Habilidades
+                    let habilidadesHtml = 'Não informadas';
+                    if (c.habilidades && c.habilidades.length > 0) {
+                        habilidadesHtml = c.habilidades.map(h => `<span style="display:inline-block;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:999px;padding:4px 12px;margin:3px;font-size:0.85rem;font-weight:600;">${h}</span>`).join('');
+                    }
+
+                    // Experiências
+                    let experienciasHtml = '<p>Nenhuma experiência informada.</p>';
+                    if (c.experiencias && c.experiencias.length > 0) {
+                        experienciasHtml = c.experiencias.map((exp, i) => `
+                            <div style="border-left:3px solid #e5e7eb;padding-left:12px;margin-bottom:12px;">
+                                <h4 style="margin:0 0 6px 0;">Experiência ${i + 1}</h4>
+                                <p><strong>Empresa:</strong> ${exp.company || 'N/A'}</p>
+                                <p><strong>Cargo/Função:</strong> ${exp.position || 'N/A'}</p>
+                                <p><strong>Tempo:</strong> ${exp.duration || 'N/A'}</p>
+                                ${exp.atividades ? `<p><strong>Principais atividades:</strong> ${exp.atividades}</p>` : ''}
+                                ${exp.empregado_atual === 'Sim' ? `<p><strong>Trabalha atualmente:</strong> Sim</p>${exp.motivo_saida_atual ? `<p><strong>Por que está saindo:</strong> ${exp.motivo_saida_atual}</p>` : ''}` : (exp.motivo_saida ? `<p><strong>Motivo da saída:</strong> ${exp.motivo_saida}</p>` : '')}
+                            </div>
+                        `).join('');
+                    }
+
+                    // Referências
+                    let referenciasHtml = '';
+                    if (c.referencias && c.referencias.length > 0) {
+                        referenciasHtml = c.referencias.map((ref, i) => `
+                            <div style="border-left:3px solid #e5e7eb;padding-left:12px;margin-bottom:10px;">
+                                <p><strong>Nome:</strong> ${ref.nome || 'N/A'}</p>
+                                ${ref.empresa ? `<p><strong>Empresa:</strong> ${ref.empresa}</p>` : ''}
+                                ${ref.cargo ? `<p><strong>Cargo:</strong> ${ref.cargo}</p>` : ''}
+                                ${ref.telefone ? `<p><strong>Telefone:</strong> ${ref.telefone}</p>` : ''}
+                            </div>
+                        `).join('');
+                    }
+
+                    modalBody.innerHTML = `
+                        <h3><i class="fas fa-user"></i> Dados Pessoais</h3>
+                        <p><strong>Nome:</strong> ${c.nome || 'N/A'}</p>
+                        <p><strong>Data de Nascimento:</strong> ${c.data_nascimento ? new Date(c.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A'}</p>
+                        <p><strong>Estado Civil:</strong> ${c.estado_civil || 'Não informado'}</p>
+                        <p><strong>Possui Filhos:</strong> ${c.possui_filhos || 'Não'}</p>
+
+                        <h3><i class="fas fa-phone"></i> Contato</h3>
+                        <p><strong>Telefone(s):</strong> ${c.telefone || 'Não informado'}</p>
+                        <p><strong>É WhatsApp:</strong> ${c.is_whatsapp || 'Não'}</p>
+                        <p><strong>Email:</strong> ${c.email || 'Não informado'}</p>
+                        ${c.facebook ? `<p><strong>Facebook:</strong> ${c.facebook}</p>` : ''}
+                        ${c.instagram ? `<p><strong>Instagram:</strong> ${c.instagram}</p>` : ''}
+
+                        <h3><i class="fas fa-map-marker-alt"></i> Endereço</h3>
+                        <p><strong>Endereço:</strong> ${c.endereco || 'Não informado'}</p>
+                        <p><strong>Cidade:</strong> ${c.cidade || 'Não informado'}</p>
+                        <p><strong>Estado:</strong> ${c.estado || 'Não informado'}</p>
+
+                        <h3><i class="fas fa-calendar-check"></i> Disponibilidade</h3>
+                        <p><strong>Pode começar:</strong> ${c.disponibilidade_inicio || 'Não informado'}${c.disponibilidade_inicio === 'Outra data' && c.disponibilidade_outra_data ? ' (' + new Date(c.disponibilidade_outra_data + 'T00:00:00').toLocaleDateString('pt-BR') + ')' : ''}</p>
+                        <p><strong>Sábados:</strong> ${c.disponibilidade_sabados || 'Não informado'}</p>
+                        <p><strong>Horas extras:</strong> ${c.disponibilidade_horas_extras || 'Não informado'}</p>
+
+                        <h3><i class="fas fa-money-bill-wave"></i> Pretensão Salarial</h3>
+                        <p>${c.pretensao_salarial || 'Não informada'}</p>
+
+                        <h3><i class="fas fa-graduation-cap"></i> Formação</h3>
+                        <p><strong>Escolaridade:</strong> ${c.escolaridade || 'Não informado'}</p>
+                        <p><strong>Está Estudando:</strong> ${c.estudando || 'Não'}</p>
+                        ${c.periodo_estudo ? `<p><strong>Período de Estudo:</strong> ${c.periodo_estudo}</p>` : ''}
+                        ${c.curso_atual ? `<p><strong>Curso Atual:</strong> ${c.curso_atual}</p>` : ''}
+                        ${c.instituicao_curso ? `<p><strong>Instituição:</strong> ${c.instituicao_curso}</p>` : ''}
+                        ${c.situacao_curso ? `<p><strong>Situação do Curso:</strong> ${c.situacao_curso}</p>` : ''}
+                        ${c.ano_conclusao_curso ? `<p><strong>Ano Conclusão/Previsão:</strong> ${c.ano_conclusao_curso}</p>` : ''}
+                        <p><strong>Possui Cursos:</strong> ${c.possui_cursos || 'Não'}</p>
+                        ${c.cursos ? `<p><strong>Cursos:</strong><br>${c.cursos.replace(/\n/g, '<br>')}</p>` : ''}
+
+                        <h3><i class="fas fa-star"></i> Habilidades</h3>
+                        <p>${habilidadesHtml}</p>
+                        <p><strong>Conhecimento em Informática:</strong> ${c.conhecimento_informatica || 'Não informado'}</p>
+
+                        <h3><i class="fas fa-briefcase"></i> Experiência Profissional</h3>
+                        <p><strong>Possui Experiência:</strong> ${c.possui_experiencia || 'Não'}</p>
+                        ${experienciasHtml}
+                        ${c.expectativa_primeiro_emprego ? `<p><strong>Expectativa 1º Emprego:</strong> ${c.expectativa_primeiro_emprego}</p>` : ''}
+
+                        <h3><i class="fas fa-info-circle"></i> Informações Complementares</h3>
+                        <p><strong>Como conheceu a vaga:</strong> ${c.como_conheceu || 'Não informado'}${c.como_conheceu === 'Outro' && c.como_conheceu_outro ? ' - ' + c.como_conheceu_outro : ''}</p>
+                        <p><strong>Possui referência:</strong> ${c.referencias && c.referencias.length > 0 ? 'Sim' : 'Não'}</p>
+                        ${referenciasHtml}
+
+                        <h3><i class="fas fa-target"></i> Objetivo</h3>
+                        <p>${c.motivacao ? c.motivacao.replace(/\n/g, '<br>') : 'Não informado'}</p>
+
+                        <h3><i class="fas fa-file-alt"></i> Arquivos</h3>
+                        ${c.arquivo_curriculo ? `<p><a href="../uploads/${encodeURIComponent(c.arquivo_curriculo)}" target="_blank" style="color:#dc2626;"><i class="fas fa-file-pdf"></i> Currículo (PDF)</a></p>` : '<p>Nenhum currículo anexado</p>'}
+                        ${c.arquivo_foto ? `<p><a href="../uploads/${encodeURIComponent(c.arquivo_foto)}" target="_blank" style="color:#059669;"><i class="fas fa-camera"></i> Foto</a></p>` : '<p>Nenhuma foto anexada</p>'}
+
+                        <hr>
+                        <p style="font-size:0.85rem;color:#6b7280;"><strong>Status:</strong> ${c.status || 'Não definido'} | <strong>Visualizado:</strong> ${c.visualizado ? 'Sim' : 'Não'} | <strong>Aceitou Termos:</strong> ${c.aceitou_termos ? 'Sim' : 'Não'} | <strong>LGPD:</strong> ${c.consentimento_lgpd || 'Não'} | <strong>Banco de Talentos:</strong> ${c.consentimento_banco_talentos || 'Não'} | <strong>IP:</strong> ${c.ip_cadastro || 'N/A'} | <strong>Cadastro:</strong> ${new Date(c.data_cadastro).toLocaleString('pt-BR')}</p>
+                    `;
+                })
+                .catch(err => {
+                    modalBody.innerHTML = '<p class="error-message">Erro ao carregar os dados: ' + err + '</p>';
+                });
+        }
+
+        function deleteCurriculo(id, element) {
+            if (!confirm('Tem certeza que deseja deletar este currículo?\n\nEsta ação também removerá os arquivos associados e não pode ser desfeita.')) {
+                return;
+            }
+            const formData = new FormData();
+            formData.append('action', 'deleteCurriculo');
+            formData.append('id', id);
+            formData.append('csrf_token', csrfToken);
+
+            fetch('admin.php', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const row = element.closest('tr');
+                        if (row) row.remove();
+                    } else {
+                        alert('Erro: ' + data.message);
+                    }
+                })
+                .catch(err => alert('Ocorreu um erro de comunicação com o servidor.'));
+        }
 
         // Inicialização
         document.addEventListener('DOMContentLoaded', function() {

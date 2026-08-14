@@ -9,7 +9,7 @@
     <meta http-equiv="Expires" content="0">
     <title>Sistema de Cadastro de Currículos - GOR INFORMÁTICA</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="styles.css?v=3.1" rel="stylesheet">
+    <link href="styles.css?v=3.3" rel="stylesheet">
 </head>
 <body>
     <div class="container">
@@ -40,11 +40,6 @@
                     <p>Para continuar, marque a opção abaixo para liberar seu cadastro. <b>Todos os campos marcados com * são de preenchimento obrigatório</b> — o sistema não permitirá o envio caso algum desses campos não esteja preenchido.</p>
                     <p class="small-text">Seu currículo ficará armazenado em nosso banco de dados. Caso surja uma vaga compatível com o seu perfil nos proximos meses, entraremos em contato, não é necessário enviar o curriculo mais de uma vez.</p>
                     <p> Após 06(seis) meses removeremos do nosso sistema todos os curriculos, por considerar que já estarão desatualizados</p>
-                </div>
-
-                <div class="privacy-section">
-                    <h3><i class="fas fa-file-shield"></i> Aviso de Privacidade</h3>
-                    <p>Ao preencher este cadastro, você autoriza a GOR Informática a coletar, armazenar e utilizar seus dados pessoais para fins de contato relacionados a oportunidades compatíveis com seu perfil, conforme a necessidade da empresa. Seus dados serão tratados em conformidade com a Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018), garantindo sua privacidade e segurança.</p>
                 </div>
 
                 <div class="job-info">
@@ -90,57 +85,41 @@
                     <p>📌 <strong>Atenção:</strong> Caso encontre algum problema ao cadastrar seu currículo, entre em contato conosco pelo WhatsApp (61) 3359-7358, informando o erro ocorrido para que possamos corrigi-lo o quanto antes.</p>
                 </div>
 
-                <form id="curriculumForm" enctype="multipart/form-data">
+                <form id="curriculumForm" enctype="multipart/form-data" novalidate>
                     <!-- Honeypot anti-spam: campo invisivel para humanos -->
                     <div style="position: absolute; left: -9999px;" aria-hidden="true">
                         <input type="text" name="website" tabindex="-1" autocomplete="off">
                     </div>
-                    <!-- Terms Section -->
-                    <div class="form-section">
-                        <div class="form-group">
-                            <label class="required">✅ Você aceita as condições acima?</label>
-                            <div class="radio-group">
-                                <label class="radio-label">
-                                    <input type="radio" name="acceptTerms" value="sim, aceito" required>
-                                    <span>✅ Sim, declaro que li e aceito as condições acima</span>
-                                </label>
-                                <label class="radio-label">
-                                    <input type="radio" name="acceptTerms" value="não, obrigado">
-                                    <span>❌ Não, obrigado!</span>
-                                </label>
-                            </div>
+
+                    <!-- ================= 1. CONSENTIMENTO E LGPD ================= -->
+                    <div id="lgpdSection" class="form-section">
+                        <h3><i class="fas fa-file-shield"></i> 🔒 Consentimento e LGPD</h3>
+
+                        <div class="privacy-section">
+                            <p>Ao preencher este cadastro, você autoriza a GOR Informática a coletar, armazenar e utilizar seus dados pessoais para fins de contato relacionados a oportunidades compatíveis com seu perfil, conforme a necessidade da empresa. Seus dados serão tratados em conformidade com a Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018), garantindo sua privacidade e segurança.</p>
                         </div>
 
-                        <div id="workScheduleSection" class="conditional-section" style="display: none;">
-                            <div class="info-box">
-                                <h4>🕒 Horário da Vaga</h4>
-                                <p>A vaga será para o período diúrno, totalizando 8 horas diárias.</p>
-                            </div>
-                            
-                            <div class="form-group">
-                                <div class="radio-group">
-                                    <label class="radio-label">
-                                        <input type="radio" name="workSchedule" value="Posso ambos os periodos">
-                                        <span>Ok, compreendo! Posso trabalhar em ambos os períodos</span>
-                                    </label>
-                                    <label class="radio-label">
-                                        <input type="radio" name="workSchedule" value="Período da tarde">
-                                        <span>Não posso o dia todo, mas gostaria de ficar apenas no período da tarde</span>
-                                    </label>
-                                    <label class="radio-label">
-                                        <input type="radio" name="workSchedule" value="Periodo da manha">
-                                        <span>Não posso o dia todo, mas gostaria de ficar apenas no período da manhã</span>
-                                    </label>
-                                </div>
-                            </div>
+                        <div class="consent-box">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="consentimentoLgpd" value="1">
+                                <span><b>Autorizo o tratamento dos meus dados pessoais e documentos enviados neste formulário</b> para fins de participação em processos seletivos e recrutamento. <b>☑ Li e concordo.</b></span>
+                            </label>
                         </div>
 
-                        <div id="rejectMessage" class="error-box" style="display: none;">
-                            <p>📎 Para enviar seu currículo, é necessário aceitar os termos acima. ⚠️⚠️⚠️</p>
+                        <div class="consent-box">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="consentimentoBancoTalentos" value="1">
+                                <span><b>Autorizo que meu currículo seja considerado em futuras oportunidades</b> compatíveis com meu perfil.</span>
+                            </label>
+                        </div>
+
+                        <div class="info-box">
+                            <p><i class="fas fa-clock"></i> <b>Por quanto tempo os dados serão mantidos?</b> Os currículos e dados pessoais serão armazenados por até <b>06 (seis) meses</b> após o cadastro, sendo removidos após esse período por considerarmos que estarão desatualizados.</p>
+                            <p><i class="fas fa-book"></i> <b>Política de Privacidade:</b> você pode solicitar acessar nossa política de privacidade ou pedir a exclusão dos seus dados a qualquer momento pelo WhatsApp (61) 3359-7358 ou pelo e-mail lojagor@gmail.com.</p>
                         </div>
                     </div>
 
-                    <!-- Personal Data Section -->
+                    <!-- ================= 2. DADOS PESSOAIS ================= -->
                     <div id="personalDataSection" class="form-section conditional-section" style="display: none;">
                         <h3><i class="fas fa-user"></i> 🆔 Dados Pessoais</h3>
                         
@@ -181,7 +160,7 @@
                         </div>
                     </div>
 
-                    <!-- Contact Section -->
+                    <!-- ================= 3. CONTATO ================= -->
                     <div id="contactSection" class="form-section conditional-section" style="display: none;">
                         <h3><i class="fas fa-phone"></i> 📞 Contato</h3>
                         
@@ -228,7 +207,7 @@
                         </div>
                     </div>
 
-                    <!-- Address Section -->
+                    <!-- ================= 4. ENDEREÇO ================= -->
                     <div id="addressSection" class="form-section conditional-section" style="display: none;">
                         <h3><i class="fas fa-map-marker-alt"></i> 🏠 Endereço</h3>
                         
@@ -250,7 +229,81 @@
                         </div>
                     </div>
 
-                    <!-- Education Section -->
+                    <!-- ================= 5. DISPONIBILIDADE ================= -->
+                    <div id="availabilitySection" class="form-section conditional-section" style="display: none;">
+                        <h3><i class="fas fa-calendar-check"></i> 🕒 Disponibilidade para Contratação</h3>
+
+                        <div class="form-group">
+                            <label class="required">Quando você poderia começar?</label>
+                            <div class="radio-group">
+                                <label class="radio-label">
+                                    <input type="radio" name="disponibilidadeInicio" value="Imediatamente">
+                                    <span>Imediatamente</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="disponibilidadeInicio" value="Em até 7 dias">
+                                    <span>Em até 7 dias</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="disponibilidadeInicio" value="Em até 15 dias">
+                                    <span>Em até 15 dias</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="disponibilidadeInicio" value="Em até 30 dias">
+                                    <span>Em até 30 dias</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="disponibilidadeInicio" value="Outra data">
+                                    <span>Outra data</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="availabilityDateSection" class="conditional-section" style="display: none;">
+                            <div class="form-group">
+                                <label class="required">📅 Qual data você poderia começar?</label>
+                                <input type="date" name="disponibilidadeOutraData">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="required">Tem disponibilidade para trabalhar aos sábados?</label>
+                            <div class="radio-group">
+                                <label class="radio-label">
+                                    <input type="radio" name="disponibilidadeSabados" value="Sim">
+                                    <span>Sim</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="disponibilidadeSabados" value="Não">
+                                    <span>Não</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="disponibilidadeSabados" value="Dependendo da necessidade">
+                                    <span>Dependendo da necessidade</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="required">Tem disponibilidade para horas extras eventualmente?</label>
+                            <div class="radio-group">
+                                <label class="radio-label">
+                                    <input type="radio" name="disponibilidadeHorasExtras" value="Sim">
+                                    <span>Sim</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="disponibilidadeHorasExtras" value="Não">
+                                    <span>Não</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="disponibilidadeHorasExtras" value="Dependendo da necessidade">
+                                    <span>Dependendo da necessidade</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ================= 6. FORMAÇÃO ================= -->
                     <div id="educationSection" class="form-section conditional-section" style="display: none;">
                         <h3><i class="fas fa-graduation-cap"></i> 🎓 Formação</h3>
                         
@@ -283,43 +336,128 @@
                             </div>
                         </div>
 
-                        <div id="studyPeriodSection" class="conditional-section" style="display: none;">
-                            <div class="form-group">
-                                <label class="required">Qual período?</label>
-                                <select name="studyPeriod">
-                                    <option value="">- Selecione -</option>
-                                    <option value="Matutino">Matutino</option>
-                                    <option value="Diúrno">Diúrno</option>
-                                    <option value="Noturno">Noturno</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div id="coursesSection" class="conditional-section" style="display: none;">
-                            <div class="form-group">
-                                <label class="required">Possui algum curso?</label>
-                                <div class="radio-group">
-                                    <label class="radio-label">
-                                        <input type="radio" name="hasCourses" value="Sim" required>
-                                        <span>Sim</span>
-                                    </label>
-                                    <label class="radio-label">
-                                        <input type="radio" name="hasCourses" value="Não">
-                                        <span>Não</span>
-                                    </label>
+                        <div id="studyDetailSection" class="conditional-section" style="display: none;">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="required">Qual período?</label>
+                                    <select name="studyPeriod">
+                                        <option value="">- Selecione -</option>
+                                        <option value="Matutino">Matutino</option>
+                                        <option value="Vespertino">Vespertino</option>
+                                        <option value="Noturno">Noturno</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="required">📚 Qual curso você está fazendo?</label>
+                                    <input type="text" name="cursoAtual" placeholder="Ex.: Ensino Médio, Administração...">
                                 </div>
                             </div>
-
-                            <div id="coursesDetailSection" class="conditional-section" style="display: none;">
+                            <div class="form-row">
                                 <div class="form-group">
-                                    <label class="required">📚 Cursos</label>
-                                    <textarea name="courses" rows="3" placeholder="Descreva os cursos que você possui separados por vírgula."></textarea>
+                                    <label class="required">🏫 Instituição</label>
+                                    <input type="text" name="instituicaoCurso" placeholder="Nome da escola/faculdade">
+                                </div>
+                                <div class="form-group">
+                                    <label class="required">Situação</label>
+                                    <div class="radio-group">
+                                        <label class="radio-label">
+                                            <input type="radio" name="situacaoCurso" value="Concluído">
+                                            <span>Concluído</span>
+                                        </label>
+                                        <label class="radio-label">
+                                            <input type="radio" name="situacaoCurso" value="Em andamento">
+                                            <span>Em andamento</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="anoConclusaoSection" class="conditional-section" style="display: none;">
+                                <div class="form-group">
+                                    <label class="required">Ano de conclusão ou previsão</label>
+                                    <input type="text" name="anoConclusaoCurso" placeholder="Ex.: 2026" pattern="\d{4}">
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Experience Section -->
+                    <!-- ================= 7. CURSOS E CERTIFICAÇÕES ================= -->
+                    <div id="coursesSection" class="form-section conditional-section" style="display: none;">
+                        <h3><i class="fas fa-certificate"></i> 📚 Cursos e Certificações</h3>
+
+                        <div class="form-group">
+                            <label class="required">Possui algum curso?</label>
+                            <div class="radio-group">
+                                <label class="radio-label">
+                                    <input type="radio" name="hasCourses" value="Sim" required>
+                                    <span>Sim</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="hasCourses" value="Não">
+                                    <span>Não</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="coursesDetailSection" class="conditional-section" style="display: none;">
+                            <div class="form-group">
+                                <label class="required">📚 Cursos</label>
+                                <textarea name="courses" rows="3" placeholder="Descreva os cursos que você possui separados por vírgula."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ================= 8. HABILIDADES ================= -->
+                    <div id="skillsSection" class="form-section conditional-section" style="display: none;">
+                        <h3><i class="fas fa-star"></i> ⭐ Habilidades</h3>
+
+                        <div class="form-group">
+                            <label class="required">Quais são suas principais habilidades? <small>(selecione todas que se aplicar)</small></label>
+                            <div class="checkbox-grid" id="habilidadesGrid">
+                                <label class="checkbox-label"><input type="checkbox" name="habilidades[]" value="Atendimento ao cliente"><span>Atendimento ao cliente</span></label>
+                                <label class="checkbox-label"><input type="checkbox" name="habilidades[]" value="Vendas"><span>Vendas</span></label>
+                                <label class="checkbox-label"><input type="checkbox" name="habilidades[]" value="Informática"><span>Informática</span></label>
+                                <label class="checkbox-label"><input type="checkbox" name="habilidades[]" value="Organização"><span>Organização</span></label>
+                                <label class="checkbox-label"><input type="checkbox" name="habilidades[]" value="Caixa"><span>Caixa</span></label>
+                                <label class="checkbox-label"><input type="checkbox" name="habilidades[]" value="Estoque"><span>Estoque</span></label>
+                                <label class="checkbox-label"><input type="checkbox" name="habilidades[]" value="Comunicação"><span>Comunicação</span></label>
+                                <label class="checkbox-label"><input type="checkbox" name="habilidades[]" value="Trabalho em equipe"><span>Trabalho em equipe</span></label>
+                                <label class="checkbox-label"><input type="checkbox" name="habilidades[]" value="Liderança"><span>Liderança</span></label>
+                                <label class="checkbox-label"><input type="checkbox" name="habilidades[]" value="Redes sociais"><span>Redes sociais</span></label>
+                                <label class="checkbox-label"><input type="checkbox" name="habilidades[]" value="Outra" id="habilidadeOutraCheckbox"><span>Outra</span></label>
+                            </div>
+                        </div>
+
+                        <div id="habilidadeOutraSection" class="conditional-section" style="display: none;">
+                            <div class="form-group">
+                                <label class="required">Qual outra habilidade?</label>
+                                <input type="text" name="habilidadeOutra" placeholder="Descreva sua habilidade">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="required">💻 Como você considera seu conhecimento em informática?</label>
+                            <div class="radio-group">
+                                <label class="radio-label">
+                                    <input type="radio" name="conhecimentoInformatica" value="Básico">
+                                    <span>Básico</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="conhecimentoInformatica" value="Intermediário">
+                                    <span>Intermediário</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="conhecimentoInformatica" value="Avançado">
+                                    <span>Avançado</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="conhecimentoInformatica" value="Não possuo conhecimento">
+                                    <span>Não possuo conhecimento</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ================= 9. EXPERIÊNCIA PROFISSIONAL ================= -->
                     <div id="experienceSection" class="form-section conditional-section" style="display: none;">
                         <h3><i class="fas fa-briefcase"></i> 📋 Experiência Profissional</h3>
                         
@@ -355,19 +493,143 @@
                                             <input type="text" name="duration1" placeholder="Ex: 1 ano, 6 meses">
                                         </div>
                                     </div>
+                                    <div class="form-group">
+                                        <label>Principais atividades</label>
+                                        <textarea name="atividades1" rows="2" placeholder="Descreva brevemente o que você fazia"></textarea>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Você ainda trabalha nesta empresa?</label>
+                                            <select name="empregadoAtual1" data-current-job="1">
+                                                <option value="Não">Não</option>
+                                                <option value="Sim">Sim, ainda trabalho lá</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group" data-motivo-saida="1">
+                                            <label>Motivo da saída</label>
+                                            <input type="text" name="motivoSaida1" placeholder="Ex.: busca de novos desafios">
+                                        </div>
+                                    </div>
+                                    <div class="form-group current-job-reason" data-current-reason="1" style="display: none;">
+                                        <label class="required">Se você ainda está na empresa, por que está saindo dela?</label>
+                                        <textarea name="motivoSaidaAtual1" rows="2" placeholder="Conte o motivo de estar procurando outra oportunidade"></textarea>
+                                    </div>
                                 </div>
                             </div>
                             
-                            <button type="button" id="addExperienceBtn" class="btn-secondary" style="display: none;">
+                            <button type="button" id="addExperienceBtn" class="btn-secondary">
                                 <i class="fas fa-plus"></i>
                                 Adicionar outra experiência
                             </button>
                         </div>
+
+                        <div id="firstJobSection" class="conditional-section" style="display: none;">
+                            <div class="form-group">
+                                <label class="required">🎯 O que você espera aprender no seu primeiro emprego?</label>
+                                <textarea name="expectativaPrimeiroEmprego" rows="3" placeholder="Conte suas expectativas de aprendizado e crescimento"></textarea>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Objective Section -->
+                    <!-- ================= 10. INFORMAÇÕES COMPLEMENTARES ================= -->
+                    <div id="additionalInfoSection" class="form-section conditional-section" style="display: none;">
+                        <h3><i class="fas fa-info-circle"></i> ℹ️ Informações Complementares</h3>
+
+                        <div class="form-group">
+                            <label class="required">Como ficou sabendo desta oportunidade?</label>
+                            <div class="radio-group">
+                                <label class="radio-label">
+                                    <input type="radio" name="comoConheceu" value="Instagram">
+                                    <span>Instagram</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="comoConheceu" value="Facebook">
+                                    <span>Facebook</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="comoConheceu" value="WhatsApp">
+                                    <span>WhatsApp</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="comoConheceu" value="Indicação">
+                                    <span>Indicação</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="comoConheceu" value="Site">
+                                    <span>Site</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="comoConheceu" value="Indeed">
+                                    <span>Indeed</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="comoConheceu" value="LinkedIn">
+                                    <span>LinkedIn</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="comoConheceu" value="Outro">
+                                    <span>Outro (especifique)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="comoConheceuOutroSection" class="conditional-section" style="display: none;">
+                            <div class="form-group">
+                                <label class="required">Especifique como ficou sabendo:</label>
+                                <input type="text" name="comoConheceuOutro" placeholder="Ex.: cartaz na rua, jornal...">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Possui alguém que possa fornecer referência profissional? <small>(opcional)</small></label>
+                            <div class="radio-group">
+                                <label class="radio-label">
+                                    <input type="radio" name="possuiReferencia" value="Sim">
+                                    <span>Sim</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="possuiReferencia" value="Não">
+                                    <span>Não</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="referencesSection" class="conditional-section" style="display: none;">
+                            <div id="referencesContainer">
+                                <div class="reference-card" data-reference="1">
+                                    <h4>Referência 1</h4>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label class="required">Nome</label>
+                                            <input type="text" name="refNome1" placeholder="Nome da pessoa">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Empresa</label>
+                                            <input type="text" name="refEmpresa1" placeholder="Empresa onde trabalhou">
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Cargo</label>
+                                            <input type="text" name="refCargo1" placeholder="Cargo da pessoa">
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="required">Telefone</label>
+                                            <input type="tel" name="refTelefone1" placeholder="(00)00000-0000">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" id="addReferenceBtn" class="btn-secondary">
+                                <i class="fas fa-plus"></i>
+                                Adicionar outra referência
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ================= 11. OBJETIVO PROFISSIONAL ================= -->
                     <div id="objectiveSection" class="form-section conditional-section" style="display: none;">
-                        <h3><i class="fas fa-target"></i> 🎯 Objetivo</h3>
+                        <h3><i class="fas fa-target"></i> 🎯 Objetivo Profissional</h3>
                         
                         <div class="form-group">
                             <label class="required">Por que você gostaria de trabalhar em nossa empresa?</label>
@@ -375,7 +637,31 @@
                         </div>
                     </div>
 
-                    <!-- Files Section -->
+                    <!-- ================= 12. PRETENSÃO SALARIAL ================= -->
+                    <div id="salarySection" class="form-section conditional-section" style="display: none;">
+                        <h3><i class="fas fa-money-bill-wave"></i> 💰 Pretensão Salarial</h3>
+
+                        <div class="form-group">
+                            <label>Qual sua pretensão salarial? <small>(opcional)</small></label>
+                            <input type="text" name="pretensaoSalarial" id="pretensaoSalarial" placeholder="Ex.: R$ 1.500,00">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="pretensaoACombinar" id="pretensaoACombinar" value="1">
+                                <span>A combinar</span>
+                            </label>
+                        </div>
+
+                        <p class="small-text">Não se preocupe: você pode deixar este campo em branco se preferir combinar depois.</p>
+
+                        <button type="button" class="btn-primary" id="continueSalaryBtn">
+                            <i class="fas fa-arrow-right"></i>
+                            Continuar
+                        </button>
+                    </div>
+
+                    <!-- ================= 13/14. CURRÍCULO E FOTO ================= -->
                     <div id="filesSection" class="form-section conditional-section" style="display: none;">
                         <h3><i class="fas fa-file-alt"></i> 📎 Documentos</h3>
                         
@@ -402,6 +688,34 @@
                                 </div>
                                 <input type="file" name="photo" accept="image/*,.heic,.heif" required>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- ================= 15. CONSENTIMENTO FINAL ================= -->
+                    <div id="finalConsentSection" class="form-section conditional-section" style="display: none;">
+                        <h3><i class="fas fa-check-circle"></i> ✅ Consentimento Final</h3>
+
+                        <div class="form-group">
+                            <label class="required">Você aceita as condições acima?</label>
+                            <div class="radio-group">
+                                <label class="radio-label">
+                                    <input type="radio" name="acceptTerms" value="sim, aceito" required>
+                                    <span>✅ Sim, declaro que li e aceito as condições acima</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="acceptTerms" value="não, obrigado">
+                                    <span>❌ Não, obrigado!</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="rejectMessage" class="error-box" style="display: none;">
+                            <p>📎 Para enviar seu currículo, é necessário aceitar os termos acima. ⚠️⚠️⚠️</p>
+                        </div>
+
+                        <div id="validationSummary" class="error-box validation-summary" style="display: none;">
+                            <h4><i class="fas fa-exclamation-triangle"></i> Verifique os campos destacados:</h4>
+                            <ul id="validationList"></ul>
                         </div>
 
                         <div class="contact-info">
@@ -434,9 +748,9 @@
 
     </div>
 
-    <script src="form-tracker.js?v=3.4"></script>
+    <script src="form-tracker.js?v=3.5"></script>
     
-    <script src="script.js?v=3.4"></script>
+    <script src="script.js?v=4.0"></script>
 
 </body>
 </html>

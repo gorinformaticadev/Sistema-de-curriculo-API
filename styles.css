@@ -790,6 +790,39 @@ body {
     .form-row {
         gap: 15px;
     }
+    
+    /* Botões em largura total no celular (exceto remover) */
+    .btn-primary,
+    .btn-secondary,
+    .btn-submit {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .btn-remove {
+        width: auto;
+    }
+    
+    /* Cabeçalho compacto */
+    .logo h1 {
+        font-size: 1.4rem;
+    }
+    
+    .logo p {
+        font-size: 0.85rem;
+    }
+    
+    /* Radio/checkbox com alvos de toque maiores */
+    .radio-label,
+    .checkbox-label {
+        padding: 10px 12px;
+    }
+    
+    .radio-label input[type="radio"],
+    .checkbox-label input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+    }
 }
 
 #typing-text {
@@ -810,6 +843,216 @@ body {
     display: none;
 }
 
-.hidden-section {
-    display: none;
+/* ============ NOVAS SEÇÕES DO FORMULÁRIO (v3.2) ============ */
+
+/* Texto auxiliar pequeno */
+.small-text {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-top: 5px;
+}
+
+/* Grade de checkboxes de habilidades */
+.checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px;
+}
+
+/* Checkbox grande com texto ao lado */
+.checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: 500;
+    color: #374151;
+    padding: 8px 10px;
+    border-radius: 8px;
+    transition: background 0.2s ease;
+}
+
+.checkbox-label:hover {
+    background: #eff6ff;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    cursor: pointer;
+    accent-color: #1e40af;
+    flex-shrink: 0;
+}
+
+.checkbox-label span {
+    line-height: 1.4;
+}
+
+/* Caixa de consentimento LGPD destacada */
+.consent-box {
+    background: white;
+    border: 2px solid #bfdbfe;
+    border-left: 5px solid #1e40af;
+    border-radius: 10px;
+    padding: 5px 15px;
+    margin-bottom: 15px;
+}
+
+.consent-box .checkbox-label {
+    padding: 12px 10px;
+}
+
+/* Card de referência profissional */
+.reference-card {
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.reference-card h4 {
+    color: #1e40af;
+    margin-bottom: 20px;
+    font-size: 1.1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Bloco condicional "por que está saindo da empresa atual" */
+.current-job-reason {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.current-job-reason label {
+    color: #92400e;
+}
+
+/* Seção de privacidade */
+.privacy-section {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+}
+
+.privacy-section p {
+    color: #1e3a8a;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* Responsividade da grade de checkboxes em telas pequenas */
+@media (max-width: 600px) {
+    .checkbox-grid {
+        grid-template-columns: 1fr;
+        padding: 15px;
+    }
+}
+
+/* ============ VALIDAÇÃO DE CAMPOS (v3.2) ============ */
+
+/* Compatibilidade mobile: remove atraso de 300ms e zoom em toques */
+button,
+input[type="submit"],
+.btn-primary,
+.btn-secondary,
+.btn-submit,
+.btn-remove {
+    touch-action: manipulation;
+}
+
+/* Evita zoom automático do iOS Safari ao focar campos (font-size >= 16px) */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="date"],
+input[type="number"],
+select,
+textarea {
+    font-size: 16px;
+}
+
+/* Ajuste para navegadores antigos sem suporte a grid */
+@supports not (display: grid) {
+    .form-row {
+        display: block;
+    }
+    .form-row .form-group {
+        margin-bottom: 15px;
+    }
+    .checkbox-grid {
+        display: block;
+    }
+    .checkbox-grid .checkbox-label {
+        margin-bottom: 8px;
+    }
+}
+
+/* Campo com erro de preenchimento */
+.form-group.field-error input,
+.form-group.field-error select,
+.form-group.field-error textarea,
+input.field-error,
+select.field-error,
+textarea.field-error {
+    border: 2px solid #dc2626 !important;
+    background-color: #fef2f2 !important;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+.form-group.field-error .radio-group,
+.form-group.field-error .checkbox-grid,
+.form-group.field-error .consent-box {
+    border: 2px solid #dc2626 !important;
+    background-color: #fef2f2;
+    border-radius: 8px;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+.form-group.field-error > label,
+.form-group.field-error label {
+    color: #b91c1c;
+}
+
+/* Resumo de erros no final do formulário */
+.validation-summary {
+    margin-bottom: 20px;
+    background: #fef2f2;
+    border: 2px solid #dc2626;
+    border-radius: 10px;
+    padding: 18px 20px;
+}
+
+.validation-summary h4 {
+    color: #b91c1c;
+    margin: 0 0 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.validation-summary ul {
+    margin: 0 0 0 20px;
+    padding: 0;
+}
+
+.validation-summary li {
+    color: #dc2626;
+    margin-bottom: 5px;
+    font-size: 0.95rem;
+    line-height: 1.4;
 }

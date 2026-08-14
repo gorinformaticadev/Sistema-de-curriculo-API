@@ -38,6 +38,10 @@ Options -Indexes
 RedirectMatch 403 ^/includes/.*$
 RedirectMatch 403 ^/config/.*$
 RedirectMatch 403 ^/api/.*$
+RedirectMatch 403 ^/scripts/.*$
+RedirectMatch 403 ^/sql/.*$
+RedirectMatch 403 ^/backups/.*$
+RedirectMatch 403 ^/builds/.*$
 
 # Proteger arquivos Git
 <FilesMatch "^\.git">

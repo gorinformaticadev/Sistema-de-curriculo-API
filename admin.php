@@ -248,12 +248,27 @@ if (isset($_GET['action']) && $_GET['action'] === 'getCurriculoDetails' && isset
         if (!empty($curriculo['experiencias'])) {
             $curriculo['experiencias'] = json_decode($curriculo['experiencias'], true);
         }
+        // Decodificar JSON de habilidades e referências
+        if (!empty($curriculo['habilidades'])) {
+            $habilidadesDecoded = json_decode($curriculo['habilidades'], true);
+            $curriculo['habilidades'] = is_array($habilidadesDecoded) ? $habilidadesDecoded : [];
+        } else {
+            $curriculo['habilidades'] = [];
+        }
+        if (!empty($curriculo['referencias'])) {
+            $referenciasDecoded = json_decode($curriculo['referencias'], true);
+            $curriculo['referencias'] = is_array($referenciasDecoded) ? $referenciasDecoded : [];
+        } else {
+            $curriculo['referencias'] = [];
+        }
         // Converter valores booleanos de volta para texto para exibição
         $curriculo['is_whatsapp'] = $curriculo['is_whatsapp'] ? 'Sim' : 'Não';
         $curriculo['possui_filhos'] = $curriculo['possui_filhos'] ? 'Sim' : 'Não';
         $curriculo['estudando'] = $curriculo['estudando'] ? 'Sim, estou!' : 'Não, não estou!';
         $curriculo['possui_cursos'] = $curriculo['possui_cursos'] ? 'Sim' : 'Não';
         $curriculo['possui_experiencia'] = $curriculo['possui_experiencia'] ? 'Sim' : 'Não';
+        $curriculo['consentimento_lgpd'] = !empty($curriculo['consentimento_lgpd']) ? 'Sim' : 'Não';
+        $curriculo['consentimento_banco_talentos'] = !empty($curriculo['consentimento_banco_talentos']) ? 'Sim' : 'Não';
 
         echo json_encode(['success' => true, 'curriculo' => $curriculo]);
     } else {
@@ -1476,6 +1491,17 @@ $totalCurriculos = $stmt->fetchColumn();
         .experience-block h4 {
             margin-top: 0;
         }
+        .badge-skill {
+            display: inline-block;
+            background: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+            border-radius: 999px;
+            padding: 4px 12px;
+            margin: 3px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
 
         /* Estilos do Modal de Imagem (Lightbox) */
         .modal-content-image {
@@ -2694,8 +2720,40 @@ $totalCurriculos = $stmt->fetchColumn();
                                     <p><strong>Empresa:</strong> ${exp.company || 'N/A'}</p>
                                     <p><strong>Cargo:</strong> ${exp.position || 'N/A'}</p>
                                     <p><strong>Duração:</strong> ${exp.duration || 'N/A'}</p>
+                                    ${exp.atividades ? `<p><strong>Principais atividades:</strong> ${exp.atividades}</p>` : ''}
+                                    ${exp.empregado_atual === 'Sim' ? `<p><strong>Trabalha atualmente:</strong> Sim</p>${exp.motivo_saida_atual ? `<p><strong>Por que está saindo:</strong> ${exp.motivo_saida_atual}</p>` : ''}` : (exp.motivo_saida ? `<p><strong>Motivo da saída:</strong> ${exp.motivo_saida}</p>` : '')}
                                 </div>
                             `).join('');
+                        }
+
+                        // Habilidades
+                        let habilidadesHtml = '<p>Nenhuma habilidade informada.</p>';
+                        if (c.habilidades && c.habilidades.length > 0) {
+                            habilidadesHtml = c.habilidades.map(h => `<span class="badge-skill">${h}</span>`).join(' ');
+                        }
+
+                        // Referências
+                        let referenciasHtml = '<p>Nenhuma referência informada.</p>';
+                        if (c.referencias && c.referencias.length > 0) {
+                            referenciasHtml = c.referencias.map((ref, index) => `
+                                <div class="experience-block">
+                                    <h4>Referência ${index + 1}</h4>
+                                    <p><strong>Nome:</strong> ${ref.nome || 'N/A'}</p>
+                                    ${ref.empresa ? `<p><strong>Empresa:</strong> ${ref.empresa}</p>` : ''}
+                                    ${ref.cargo ? `<p><strong>Cargo:</strong> ${ref.cargo}</p>` : ''}
+                                    ${ref.telefone ? `<p><strong>Telefone:</strong> ${ref.telefone}</p>` : ''}
+                                </div>
+                            `).join('');
+                        }
+
+                        // Disponibilidade
+                        let disponibilidadeHtml = '';
+                        if (c.disponibilidade_inicio) {
+                            disponibilidadeHtml = `
+                                <p><strong>Pode começar:</strong> ${c.disponibilidade_inicio}${c.disponibilidade_inicio === 'Outra data' && c.disponibilidade_outra_data ? ' (' + new Date(c.disponibilidade_outra_data + 'T00:00:00').toLocaleDateString('pt-BR') + ')' : ''}</p>
+                                ${c.disponibilidade_sabados ? `<p><strong>Disponibilidade aos sábados:</strong> ${c.disponibilidade_sabados}</p>` : ''}
+                                ${c.disponibilidade_horas_extras ? `<p><strong>Disponibilidade para horas extras:</strong> ${c.disponibilidade_horas_extras}</p>` : ''}
+                            `;
                         }
 
                         const statusOptions = [
@@ -2792,12 +2850,37 @@ Equipe de RH</textarea>
                             <p><strong>Cidade:</strong> ${c.cidade || 'Não informado'}</p>
                             <p><strong>Estado:</strong> ${c.estado || 'Não informado'}</p>
 
+                            <h3><i class="fas fa-calendar-check"></i> Disponibilidade para Contratação</h3>
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+                                ${disponibilidadeHtml || '<p>Não informada</p>'}
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                                <div>
+                                    <h3><i class="fas fa-money-bill-wave"></i> Pretensão Salarial</h3>
+                                    <p>${c.pretensao_salarial || 'Não informada'}</p>
+                                </div>
+                                <div>
+                                    <h3><i class="fas fa-laptop"></i> Conhecimento em Informática</h3>
+                                    <p>${c.conhecimento_informatica || 'Não informado'}</p>
+                                </div>
+                            </div>
+
+                            <h3><i class="fas fa-star"></i> Habilidades</h3>
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+                                ${habilidadesHtml}
+                            </div>
+
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                                 <div>
                                     <h3><i class="fas fa-graduation-cap"></i> Formação</h3>
                                     <p><strong>Escolaridade:</strong> ${c.escolaridade || 'Não informado'}</p>
                                     <p><strong>Está Estudando?:</strong> ${c.estudando ? 'Sim' : 'Não'}</p>
                                     ${c.periodo_estudo ? `<p><strong>Período de Estudo:</strong> ${c.periodo_estudo}</p>` : ''}
+                                    ${c.curso_atual ? `<p><strong>Curso Atual:</strong> ${c.curso_atual}</p>` : ''}
+                                    ${c.instituicao_curso ? `<p><strong>Instituição:</strong> ${c.instituicao_curso}</p>` : ''}
+                                    ${c.situacao_curso ? `<p><strong>Situação do Curso:</strong> ${c.situacao_curso}</p>` : ''}
+                                    ${c.ano_conclusao_curso ? `<p><strong>Ano Conclusão/Previsão:</strong> ${c.ano_conclusao_curso}</p>` : ''}
                                     <p><strong>Possui Cursos?:</strong> ${c.possui_cursos ? 'Sim' : 'Não'}</p>
                                     ${c.cursos ? `<p><strong>Cursos:</strong><br><div style="background: #f8fafc; padding: 10px; border-radius: 6px; margin-top: 5px;">${c.cursos.replace(/\n/g, '<br>')}</div></p>` : ''}
                                 </div>
@@ -2808,6 +2891,22 @@ Equipe de RH</textarea>
                                     ${experiencesHtml}
                                 </div>
                             </div>
+
+                            ${c.expectativa_primeiro_emprego ? `
+                            <h3><i class="fas fa-seedling"></i> Expectativa Primeiro Emprego</h3>
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981;">
+                                ${c.expectativa_primeiro_emprego.replace(/\n/g, '<br>')}
+                            </div>
+                            ` : ''}
+
+                            ${c.como_conheceu ? `
+                            <h3><i class="fas fa-info-circle"></i> Informações Complementares</h3>
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+                                <p><strong>Como conheceu a vaga:</strong> ${c.como_conheceu}${c.como_conheceu === 'Outro' && c.como_conheceu_outro ? ' - ' + c.como_conheceu_outro : ''}</p>
+                                <p><strong>Possui referência profissional:</strong> ${c.referencias && c.referencias.length > 0 ? 'Sim' : 'Não'}</p>
+                                ${c.referencias && c.referencias.length > 0 ? `<h4 style="margin: 10px 0 5px 0;"><i class="fas fa-user-friends"></i> Referências:</h4>${referenciasHtml}` : ''}
+                            </div>
+                            ` : ''}
 
                             <h3><i class="fas fa-target"></i> Objetivo</h3>
                             <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6;">
@@ -2827,6 +2926,10 @@ Equipe de RH</textarea>
                                     <div><strong>Data do Cadastro:</strong> ${new Date(c.data_cadastro).toLocaleString('pt-BR')}</div>
                                     ${c.data_visualizacao ? `<div><strong>Primeira Visualização:</strong> ${new Date(c.data_visualizacao).toLocaleString('pt-BR')}</div>` : ''}
                                     <div><strong>ID do Registro:</strong> #${c.id}</div>
+                                    <div><strong>Aceitou Termos:</strong> ${c.aceitou_termos ? 'Sim' : 'Não'}</div>
+                                    ${c.horario_vaga ? `<div><strong>Horário da Vaga:</strong> ${c.horario_vaga}</div>` : ''}
+                                    <div><strong>Consentimento LGPD:</strong> ${c.consentimento_lgpd || 'Não'}</div>
+                                    <div><strong>Banco de Talentos:</strong> ${c.consentimento_banco_talentos || 'Não'}</div>
                                 </div>
                             </div>
                         `;

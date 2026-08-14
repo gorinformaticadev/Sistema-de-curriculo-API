@@ -50,12 +50,28 @@ function apiGetCurriculoDetails($pdo) {
                 $curriculo['experiencias'] = json_decode($curriculo['experiencias'], true);
             }
             
+            // Decodificar JSON de habilidades e referências
+            if (!empty($curriculo['habilidades'])) {
+                $habilidadesDecoded = json_decode($curriculo['habilidades'], true);
+                $curriculo['habilidades'] = is_array($habilidadesDecoded) ? $habilidadesDecoded : [];
+            } else {
+                $curriculo['habilidades'] = [];
+            }
+            if (!empty($curriculo['referencias'])) {
+                $referenciasDecoded = json_decode($curriculo['referencias'], true);
+                $curriculo['referencias'] = is_array($referenciasDecoded) ? $referenciasDecoded : [];
+            } else {
+                $curriculo['referencias'] = [];
+            }
+            
             // Converter valores booleanos de volta para texto para exibição
             $curriculo['is_whatsapp'] = $curriculo['is_whatsapp'] ? 'Sim' : 'Não';
             $curriculo['possui_filhos'] = $curriculo['possui_filhos'] ? 'Sim' : 'Não';
             $curriculo['estudando'] = $curriculo['estudando'] ? 'Sim, estou!' : 'Não, não estou!';
             $curriculo['possui_cursos'] = $curriculo['possui_cursos'] ? 'Sim' : 'Não';
             $curriculo['possui_experiencia'] = $curriculo['possui_experiencia'] ? 'Sim' : 'Não';
+            $curriculo['consentimento_lgpd'] = !empty($curriculo['consentimento_lgpd']) ? 'Sim' : 'Não';
+            $curriculo['consentimento_banco_talentos'] = !empty($curriculo['consentimento_banco_talentos']) ? 'Sim' : 'Não';
             
             logAccess("Currículo visualizado", [
                 'curriculo_id' => $id,
@@ -222,6 +238,14 @@ function apiExportCurriculos($pdo) {
         // Formatar dados para exportação
         $exportData = [];
         foreach ($curriculos as $curriculo) {
+            $habilidadesArray = !empty($curriculo['habilidades']) ? json_decode($curriculo['habilidades'], true) : [];
+            $referenciasArray = !empty($curriculo['referencias']) ? json_decode($curriculo['referencias'], true) : [];
+            $referenciasTexto = [];
+            if (is_array($referenciasArray)) {
+                foreach ($referenciasArray as $ref) {
+                    $referenciasTexto[] = trim(($ref['nome'] ?? '') . ' | ' . ($ref['empresa'] ?? '') . ' | ' . ($ref['cargo'] ?? '') . ' | ' . ($ref['telefone'] ?? ''), " |");
+                }
+            }
             $exportData[] = [
                 'ID' => $curriculo['id'],
                 'Nome' => $curriculo['nome'],
@@ -232,6 +256,20 @@ function apiExportCurriculos($pdo) {
                 'Estado_Civil' => $curriculo['estado_civil'],
                 'Possui_Filhos' => $curriculo['possui_filhos'] ? 'Sim' : 'Não',
                 'Escolaridade' => $curriculo['escolaridade'],
+                'Curso_Atual' => $curriculo['curso_atual'] ?? '',
+                'Instituicao' => $curriculo['instituicao_curso'] ?? '',
+                'Situacao_Curso' => $curriculo['situacao_curso'] ?? '',
+                'Ano_Conclusao' => $curriculo['ano_conclusao_curso'] ?? '',
+                'Habilidades' => is_array($habilidadesArray) ? implode('; ', $habilidadesArray) : '',
+                'Conhecimento_Informatica' => $curriculo['conhecimento_informatica'] ?? '',
+                'Disponibilidade_Inicio' => $curriculo['disponibilidade_inicio'] ?? '',
+                'Disponibilidade_Sabados' => $curriculo['disponibilidade_sabados'] ?? '',
+                'Disponibilidade_Horas_Extras' => $curriculo['disponibilidade_horas_extras'] ?? '',
+                'Pretensao_Salarial' => $curriculo['pretensao_salarial'] ?? '',
+                'Como_Conheceu' => $curriculo['como_conheceu'] ?? '',
+                'Referencias' => implode(' // ', $referenciasTexto),
+                'Consentimento_LGPD' => !empty($curriculo['consentimento_lgpd']) ? 'Sim' : 'Não',
+                'Banco_Talentos' => !empty($curriculo['consentimento_banco_talentos']) ? 'Sim' : 'Não',
                 'Data_Cadastro' => formatDate($curriculo['data_cadastro']),
                 'IP_Cadastro' => $curriculo['ip_cadastro']
             ];

@@ -40,6 +40,28 @@ $options = [
 
 try {
     $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+    
+    // ============================================
+    // ATUALIZAÇÃO AUTOMÁTICA DO BANCO DE DADOS
+    // Aplica migrações pendentes a cada carregamento.
+    // A checagem é barata (1 SELECT) e as migrações
+    // são idempotentes (controladas pela tabela db_version).
+    // ============================================
+    try {
+        require_once __DIR__ . '/includes/migration.php';
+        $migration = new DatabaseMigration($pdo);
+        if ($migration->hasPendingMigrations()) {
+            $migrationResult = $migration->migrate();
+            if (empty($migrationResult['success'])) {
+                error_log('[MIGRATIONS_FAILED] ' . implode(', ', $migrationResult['errors']));
+            } else {
+                error_log('[MIGRATIONS_APPLIED] ' . count($migrationResult['applied_migrations']) . ' migração(ões) aplicada(s).');
+            }
+        }
+    } catch (Exception $migrationError) {
+        // Nunca derruba o sistema por falha de migração: registra e segue.
+        error_log('[MIGRATIONS_ERROR] ' . $migrationError->getMessage());
+    }
 } catch (PDOException $e) {
     if (strpos($e->getMessage(), 'Unknown database') !== false || strpos($e->getMessage(), 'Base de dados desconhecida') !== false) {
         try {
@@ -49,7 +71,7 @@ try {
 
             $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
 
-            require_once 'includes/migration.php';
+            require_once __DIR__ . '/includes/migration.php';
             $migration = new DatabaseMigration($pdo);
             $migrationResult = $migration->migrate();
 

@@ -68,6 +68,32 @@ class DatabaseMigration {
     }
     
     /**
+     * Verifica se existem migrações pendentes sem executá-las
+     * Consulta barata (1 SELECT) usada a cada carregamento para decidir se executa migrate()
+     */
+    public function hasPendingMigrations() {
+        $currentVersion = $this->getCurrentVersion();
+        $availableMigrations = $this->getAvailableMigrations();
+        
+        try {
+            $stmt = $this->pdo->query("SELECT version FROM {$this->versionTable}");
+            $applied = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        } catch (Exception $e) {
+            // Sem histórico de versões: considera que há pendências
+            return true;
+        }
+        
+        $appliedMap = array_flip($applied);
+        foreach ($availableMigrations as $version => $migration) {
+            if (!isset($appliedMap[$version]) && compareVersions($currentVersion, $version, '<')) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
      * Obtém todas as migrações disponíveis
      */
     public function getAvailableMigrations() {
@@ -347,6 +373,58 @@ class DatabaseMigration {
                         }
                     } catch (Exception $e) {
                         $results[] = 'Erro ao verificar user_agent: ' . $e->getMessage();
+                    }
+                    
+                    return implode(' | ', $results);
+                }
+            ],
+            '3.2.0' => [
+                'description' => 'Melhorias no formulário: disponibilidade, pretensão salarial, habilidades, informática, experiências detalhadas, referências e consentimento LGPD',
+                'script' => function($pdo) {
+                    $results = [];
+                    
+                    // Novas colunas da tabela curriculos (todas opcionais para não afetar dados existentes)
+                    $newColumns = [
+                        'disponibilidade_inicio' => "VARCHAR(50) DEFAULT NULL",
+                        'disponibilidade_outra_data' => "DATE DEFAULT NULL",
+                        'disponibilidade_sabados' => "VARCHAR(50) DEFAULT NULL",
+                        'disponibilidade_horas_extras' => "VARCHAR(50) DEFAULT NULL",
+                        'pretensao_salarial' => "VARCHAR(50) DEFAULT NULL",
+                        'habilidades' => "TEXT DEFAULT NULL",
+                        'conhecimento_informatica' => "VARCHAR(50) DEFAULT NULL",
+                        'expectativa_primeiro_emprego' => "TEXT DEFAULT NULL",
+                        'curso_atual' => "VARCHAR(255) DEFAULT NULL",
+                        'instituicao_curso' => "VARCHAR(255) DEFAULT NULL",
+                        'situacao_curso' => "VARCHAR(20) DEFAULT NULL",
+                        'ano_conclusao_curso' => "VARCHAR(10) DEFAULT NULL",
+                        'como_conheceu' => "VARCHAR(50) DEFAULT NULL",
+                        'como_conheceu_outro' => "VARCHAR(255) DEFAULT NULL",
+                        'referencias' => "TEXT DEFAULT NULL",
+                        'consentimento_lgpd' => "TINYINT(1) DEFAULT 0",
+                        'consentimento_banco_talentos' => "TINYINT(1) DEFAULT 0"
+                    ];
+                    
+                    foreach ($newColumns as $column => $definition) {
+                        try {
+                            $stmt = $pdo->prepare("
+                                SELECT COUNT(*) as count 
+                                FROM information_schema.columns 
+                                WHERE table_schema = DATABASE() 
+                                AND table_name = 'curriculos' 
+                                AND column_name = ?
+                            ");
+                            $stmt->execute([$column]);
+                            $exists = $stmt->fetch()['count'] > 0;
+                            
+                            if (!$exists) {
+                                $pdo->exec("ALTER TABLE curriculos ADD COLUMN `{$column}` {$definition}");
+                                $results[] = "Coluna '{$column}' adicionada";
+                            } else {
+                                $results[] = "Coluna '{$column}' já existia";
+                            }
+                        } catch (Exception $e) {
+                            $results[] = "Erro ao adicionar coluna '{$column}': " . $e->getMessage();
+                        }
                     }
                     
                     return implode(' | ', $results);

@@ -270,7 +270,8 @@ class FormTracker {
                 return; // Não registrar se desmarcou (opcional, mas evita ruído)
             }
         } else if (element.tagName === 'SELECT') {
-            fieldValue = element.options[element.selectedIndex]?.text || element.value;
+            const selectedOption = element.options[element.selectedIndex];
+            fieldValue = (selectedOption && selectedOption.text) || element.value;
         } else {
             fieldValue = element.value || '';
         }
@@ -313,7 +314,8 @@ class FormTracker {
 
     getFieldLabel(element) {
         // Tentar encontrar o label associado
-        const label = element.closest('.form-group')?.querySelector('label');
+        const formGroup = element.closest('.form-group');
+        const label = formGroup ? formGroup.querySelector('label') : null;
         if (label) {
             return label.textContent.trim().replace(/\*/g, '').trim();
         }
@@ -356,7 +358,7 @@ class FormTracker {
         this.setCookie('formTrackerState', JSON.stringify(dataToSave), 1);
     }
 
-    async sendInteractions(isBeforeUnload = false) {
+    sendInteractions(isBeforeUnload = false) {
         // Tentar recuperar nome/último campo se estiverem nulos
         if (!this.userName || !this.lastField) {
             const savedState = this.getCookie('formTrackerState');
@@ -380,46 +382,44 @@ class FormTracker {
         // Limpar array de interações
         this.interactions = [];
 
-        try {
-            if (isBeforeUnload) {
-                // Usar sendBeacon para envio garantido antes de sair
+        // Salvar as interações em cookies (sempre)
+        this.setCookie('formInteractions', JSON.stringify(dataToSend), 30); // Expira em 30 dias
+
+        if (isBeforeUnload) {
+            // Usar sendBeacon para envio garantido antes de sair
+            try {
                 const blob = new Blob([JSON.stringify(dataToSend)], { type: 'application/json' });
                 navigator.sendBeacon('log_interaction.php', blob);
-            } else {
-                // Envio normal via fetch
-                const response = await fetch('log_interaction.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(dataToSend)
-                });
-
-                if (response.ok) {
-                    try {
-                        const result = await response.json();
-                        if (result.errors && result.errors.length > 0) {
-                            console.warn('⚠️ Interações enviadas com erros:', result.errors);
-                        }
-                    } catch (jsonErr) {
-                        console.warn('⚠️ Resposta não-JSON do servidor de interações');
-                    }
-                } else {
-                    // Tentar ler a mensagem de erro do servidor
-                    try {
-                        const errorData = await response.json();
-                        console.error('❌ Erro ao registrar interações:', errorData.message || response.status);
-                    } catch (e) {
-                        console.error('❌ Erro HTTP ao enviar interações:', response.status, response.statusText);
-                    }
-                }
+            } catch (beaconErr) {
+                console.warn('⚠️ sendBeacon indisponível neste navegador');
             }
-        } catch (error) {
-            console.error('❌ Erro de rede ao enviar interações:', error.message);
+            return;
         }
 
-        // Salvar as interações em cookies
-        this.setCookie('formInteractions', JSON.stringify(dataToSend), 30); // Expira em 30 dias
+        // Envio normal via fetch (compatível com navegadores antigos via polyfill)
+        fetch('log_interaction.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dataToSend)
+        })
+            .then(response => {
+                if (response.ok) {
+                    return response.json()
+                        .then(result => {
+                            if (result.errors && result.errors.length > 0) {
+                                console.warn('⚠️ Interações enviadas com erros:', result.errors);
+                            }
+                        })
+                        .catch(() => console.warn('⚠️ Resposta não-JSON do servidor de interações'));
+                }
+                // Tentar ler a mensagem de erro do servidor
+                return response.json()
+                    .then(errorData => console.error('❌ Erro ao registrar interações:', errorData.message || response.status))
+                    .catch(() => console.error('❌ Erro HTTP ao enviar interações:', response.status, response.statusText));
+            })
+            .catch(error => console.error('❌ Erro de rede ao enviar interações:', error.message || error));
     }
 
     // Função para definir um cookie

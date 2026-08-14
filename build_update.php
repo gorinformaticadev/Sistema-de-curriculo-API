@@ -1,10 +1,20 @@
 <?php
 // Script para gerar pacotes de atualização automaticamente.
 // Execute no terminal: php build_update.php 1.1.0 "Notas da versão"
+// Acesso via web exige usuário administrador logado.
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+
+// Segurança: acesso via navegador somente para admin logado
+if (PHP_SAPI !== 'cli') {
+    session_start();
+    if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
+        http_response_code(403);
+        die('Acesso negado.');
+    }
+}
 
 $version = $argv[1] ?? (isset($_GET['v']) ? $_GET['v'] : '1.1.0');
 $notes = $argv[2] ?? (isset($_GET['n']) ? $_GET['n'] : 'Atualização de rotina e melhorias do sistema.');

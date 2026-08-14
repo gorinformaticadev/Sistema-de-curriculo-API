@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿<?php
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
 // Buffer de saída para evitar que HTML/warnings corrompam a resposta JSON
 ob_start();
 
@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Sanitizar e coletar dados do POST
         $formData = [];
-        $fields = ['name', 'birthDate', 'maritalStatus', 'hasChildren', 'email', 'facebook', 'instagram', 'address', 'city', 'state', 'education', 'isStudying', 'studyPeriod', 'hasCourses', 'courses', 'hasExperience', 'motivation', 'acceptTerms', 'workSchedule'];
+        $fields = ['name', 'birthDate', 'maritalStatus', 'hasChildren', 'email', 'facebook', 'instagram', 'address', 'city', 'state', 'education', 'isStudying', 'studyPeriod', 'hasCourses', 'courses', 'hasExperience', 'motivation', 'acceptTerms', 'workSchedule', 'disponibilidadeInicio', 'disponibilidadeOutraData', 'disponibilidadeSabados', 'disponibilidadeHorasExtras', 'pretensaoSalarial', 'conhecimentoInformatica', 'expectativaPrimeiroEmprego', 'cursoAtual', 'instituicaoCurso', 'situacaoCurso', 'anoConclusaoCurso', 'comoConheceu', 'comoConheceuOutro', 'possuiReferencia'];
         foreach ($fields as $field) {
             $formData[$field] = sanitizeInput($_POST[$field] ?? '');
         }
@@ -187,45 +187,109 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $isStudying_db = ($formData['isStudying'] === 'Sim, estou!') ? 1 : 0;
         $hasCourses_db = ($formData['hasCourses'] === 'Sim') ? 1 : 0;
         $hasExperience_db = ($formData['hasExperience'] === 'Sim') ? 1 : 0;
+        $consentimentoLgpd_db = !empty($_POST['consentimentoLgpd']) ? 1 : 0;
+        $consentimentoBancoTalentos_db = !empty($_POST['consentimentoBancoTalentos']) ? 1 : 0;
 
-        // Coletar experiências (simplificado)
+        // Validação LGPD: consentimento obrigatório para armazenar dados pessoais
+        if (!$consentimentoLgpd_db) {
+            sendJson(['success' => false, 'message' => 'É necessário aceitar o consentimento para tratamento dos seus dados pessoais (LGPD).'], 400);
+        }
+
+        // Validação do consentimento final
+        if ($formData['acceptTerms'] !== 'sim, aceito') {
+            sendJson(['success' => false, 'message' => 'É necessário aceitar as condições para enviar o currículo.'], 400);
+        }
+
+        // Coletar experiências (detalhadas, sem limite rígido de 3)
         $experiences = [];
-        for ($i = 1; $i <= 3; $i++) {
+        for ($i = 1; $i <= 10; $i++) {
             if (!empty($_POST["company$i"])) {
+                $empregadoAtual = sanitizeInput($_POST["empregadoAtual$i"] ?? '');
                 $experiences[] = [
                     'company' => sanitizeInput($_POST["company$i"]),
                     'position' => sanitizeInput($_POST["position$i"]),
                     'duration' => sanitizeInput($_POST["duration$i"]),
+                    'atividades' => sanitizeInput($_POST["atividades$i"] ?? ''),
+                    'empregado_atual' => ($empregadoAtual === 'Sim') ? 'Sim' : 'Não',
+                    'motivo_saida' => sanitizeInput($_POST["motivoSaida$i"] ?? ''),
+                    'motivo_saida_atual' => sanitizeInput($_POST["motivoSaidaAtual$i"] ?? ''),
                 ];
             }
         }
         $formData['experiences'] = json_encode($experiences);
 
+        // Coletar habilidades (seleção múltipla + campo "Outra")
+        $habilidades = [];
+        if (!empty($_POST['habilidades']) && is_array($_POST['habilidades'])) {
+            foreach ($_POST['habilidades'] as $habilidade) {
+                $habilidade = sanitizeInput($habilidade);
+                if ($habilidade === 'Outra' && !empty($_POST['habilidadeOutra'])) {
+                    $habilidades[] = sanitizeInput($_POST['habilidadeOutra']);
+                } elseif ($habilidade !== '') {
+                    $habilidades[] = $habilidade;
+                }
+            }
+        }
+        $formData['habilidades'] = json_encode(array_values(array_unique($habilidades)));
+
+        // Validação: ao menos uma habilidade deve ser informada
+        if (empty($habilidades)) {
+            sendJson(['success' => false, 'message' => 'Selecione pelo menos uma habilidade para continuar.'], 400);
+        }
+
+        // Coletar referências profissionais (opcional, até 2)
+        $referencias = [];
+        for ($i = 1; $i <= 2; $i++) {
+            if (!empty($_POST["refNome$i"])) {
+                $referencias[] = [
+                    'nome' => sanitizeInput($_POST["refNome$i"]),
+                    'empresa' => sanitizeInput($_POST["refEmpresa$i"] ?? ''),
+                    'cargo' => sanitizeInput($_POST["refCargo$i"] ?? ''),
+                    'telefone' => sanitizeInput($_POST["refTelefone$i"] ?? ''),
+                ];
+            }
+        }
+        $formData['referencias'] = json_encode($referencias);
+
+        // Pretensão salarial: "A combinar" substitui o valor digitado
+        if (!empty($_POST['pretensaoACombinar'])) {
+            $formData['pretensaoSalarial'] = 'A combinar';
+        }
+
         // Upload dos arquivos
         $resumeFile = uploadFile($_FILES['resume'], ['pdf'], 'curriculo');
         $photoFile = uploadFile($_FILES['photo'], ['jpg', 'jpeg', 'png', 'gif', 'heic', 'heif'], 'foto');
 
-        // --- VERIFICACAO DE DUPLICATA (Nome + Data Nascimento + Telefone) ---
+        // --- VERIFICACAO DE DUPLICATA (apenas aviso, NÃO bloqueia o envio) ---
+        // O aviso visual é feito no formulário antes do envio; aqui apenas registramos
+        // a ocorrência para a notificação enviada ao RH.
         $primeiroTelefone = !empty($phones_clean) ? $phones_clean[0] : '';
-        if (!empty($primeiroTelefone) && !empty($formData['name']) && !empty($formData['birthDate'])) {
-            $dupStmt = $pdo->prepare(
-                "SELECT id FROM curriculos WHERE nome = :nome AND data_nascimento = :data_nascimento AND (telefone LIKE :telefone1 OR telefone LIKE :telefone2)"
-            );
-            $dupStmt->execute([
-                ':nome' => $formData['name'],
-                ':data_nascimento' => $formData['birthDate'],
-                ':telefone1' => '%' . $primeiroTelefone . '%',
-                ':telefone2' => '%' . $formData['phone'] . '%'
-            ]);
-            if ($dupStmt->fetch()) {
-                logError('DUPLICATE_DETECTED: Curriculo ja cadastrado para ' . $formData['name'], 'WARNING');
-                sendJson(['success' => false, 'message' => 'Este curriculo ja foi cadastrado anteriormente. Nao e necessario envia-lo novamente.']);
+        $possivelDuplicata = false;
+        if (!empty($formData['name']) && !empty($formData['birthDate'])) {
+            $dupWhere = [];
+            $dupParams = [];
+            $dupWhere[] = "(nome = ? AND data_nascimento = ?)";
+            $dupParams[] = $formData['name'];
+            $dupParams[] = $formData['birthDate'];
+            if (!empty($formData['email']) && filter_var($formData['email'], FILTER_VALIDATE_EMAIL)) {
+                $dupWhere[] = "(email = ?)";
+                $dupParams[] = $formData['email'];
+            }
+            if (!empty($primeiroTelefone)) {
+                $dupWhere[] = "(telefone LIKE ?)";
+                $dupParams[] = '%' . $primeiroTelefone . '%';
+            }
+            $dupStmt = $pdo->prepare("SELECT COUNT(*) FROM curriculos WHERE " . implode(' OR ', $dupWhere));
+            $dupStmt->execute($dupParams);
+            $possivelDuplicata = ((int)$dupStmt->fetchColumn()) > 0;
+            if ($possivelDuplicata) {
+                logError('DUPLICATE_WARNING: Curriculo possivelmente duplicado para ' . $formData['name'] . ' (envio permitido apos aviso ao candidato)', 'WARNING');
             }
         }
 
         // Inserir no banco de dados
-        $sql = "INSERT INTO curriculos (nome, data_nascimento, estado_civil, possui_filhos, telefone, is_whatsapp, email, facebook, instagram, endereco, cidade, estado, escolaridade, estudando, periodo_estudo, possui_cursos, cursos, possui_experiencia, experiencias, motivacao, arquivo_curriculo, arquivo_foto, ip_cadastro) 
-                VALUES (:nome, :data_nascimento, :estado_civil, :possui_filhos, :telefone, :is_whatsapp, :email, :facebook, :instagram, :endereco, :cidade, :estado, :escolaridade, :estudando, :periodo_estudo, :possui_cursos, :cursos, :possui_experiencia, :experiencias, :motivacao, :arquivo_curriculo, :arquivo_foto, :ip_cadastro)";
+        $sql = "INSERT INTO curriculos (nome, data_nascimento, estado_civil, possui_filhos, telefone, is_whatsapp, email, facebook, instagram, endereco, cidade, estado, escolaridade, estudando, periodo_estudo, possui_cursos, cursos, possui_experiencia, experiencias, motivacao, arquivo_curriculo, arquivo_foto, ip_cadastro, disponibilidade_inicio, disponibilidade_outra_data, disponibilidade_sabados, disponibilidade_horas_extras, pretensao_salarial, habilidades, conhecimento_informatica, expectativa_primeiro_emprego, curso_atual, instituicao_curso, situacao_curso, ano_conclusao_curso, como_conheceu, como_conheceu_outro, referencias, consentimento_lgpd, consentimento_banco_talentos) 
+                VALUES (:nome, :data_nascimento, :estado_civil, :possui_filhos, :telefone, :is_whatsapp, :email, :facebook, :instagram, :endereco, :cidade, :estado, :escolaridade, :estudando, :periodo_estudo, :possui_cursos, :cursos, :possui_experiencia, :experiencias, :motivacao, :arquivo_curriculo, :arquivo_foto, :ip_cadastro, :disponibilidade_inicio, :disponibilidade_outra_data, :disponibilidade_sabados, :disponibilidade_horas_extras, :pretensao_salarial, :habilidades, :conhecimento_informatica, :expectativa_primeiro_emprego, :curso_atual, :instituicao_curso, :situacao_curso, :ano_conclusao_curso, :como_conheceu, :como_conheceu_outro, :referencias, :consentimento_lgpd, :consentimento_banco_talentos)";
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
@@ -251,7 +315,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':motivacao' => $formData['motivation'],
             ':arquivo_curriculo' => $resumeFile,
             ':arquivo_foto' => $photoFile,
-            ':ip_cadastro' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+            ':ip_cadastro' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            ':disponibilidade_inicio' => $formData['disponibilidadeInicio'] ?: null,
+            ':disponibilidade_outra_data' => ($formData['disponibilidadeInicio'] === 'Outra data' && !empty($formData['disponibilidadeOutraData'])) ? $formData['disponibilidadeOutraData'] : null,
+            ':disponibilidade_sabados' => $formData['disponibilidadeSabados'] ?: null,
+            ':disponibilidade_horas_extras' => $formData['disponibilidadeHorasExtras'] ?: null,
+            ':pretensao_salarial' => $formData['pretensaoSalarial'] ?: null,
+            ':habilidades' => $formData['habilidades'],
+            ':conhecimento_informatica' => $formData['conhecimentoInformatica'] ?: null,
+            ':expectativa_primeiro_emprego' => $formData['expectativaPrimeiroEmprego'] ?: null,
+            ':curso_atual' => $formData['cursoAtual'] ?: null,
+            ':instituicao_curso' => $formData['instituicaoCurso'] ?: null,
+            ':situacao_curso' => $formData['situacaoCurso'] ?: null,
+            ':ano_conclusao_curso' => $formData['anoConclusaoCurso'] ?: null,
+            ':como_conheceu' => $formData['comoConheceu'] ?: null,
+            ':como_conheceu_outro' => $formData['comoConheceuOutro'] ?: null,
+            ':referencias' => $formData['referencias'],
+            ':consentimento_lgpd' => $consentimentoLgpd_db,
+            ':consentimento_banco_talentos' => $consentimentoBancoTalentos_db
         ]);
 
         // Enviar mensagem de conclusão para números WhatsApp do usuário
@@ -302,11 +383,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($formData['studyPeriod'])) {
                 $textMessage .= "*Período de Estudo:* " . $formData['studyPeriod'] . "\n";
             }
+            if (!empty($formData['cursoAtual'])) {
+                $textMessage .= "*Curso Atual:* " . $formData['cursoAtual'] . "\n";
+                $textMessage .= "*Instituição:* " . $formData['instituicaoCurso'] . "\n";
+                $textMessage .= "*Situação:* " . $formData['situacaoCurso'] . "\n";
+                $textMessage .= "*Ano Conclusão/Previsão:* " . $formData['anoConclusaoCurso'] . "\n";
+            }
             $textMessage .= "*Possui Cursos?:* " . ($formData['hasCourses'] ?? 'N/A') . "\n";
             if (!empty($formData['courses'])) {
                 $textMessage .= "*Cursos:* " . $formData['courses'] . "\n";
             }
             $textMessage .= "\n";
+
+            $textMessage .= "*--- Habilidades ---*\n";
+            $habilidadesArray = json_decode($formData['habilidades'], true) ?: [];
+            $textMessage .= "*Habilidades:* " . (!empty($habilidadesArray) ? implode(', ', $habilidadesArray) : 'N/A') . "\n";
+            $textMessage .= "*Conhecimento em Informática:* " . ($formData['conhecimentoInformatica'] ?? 'N/A') . "\n\n";
+
+            $textMessage .= "*--- Disponibilidade ---*\n";
+            $textMessage .= "*Pode começar:* " . ($formData['disponibilidadeInicio'] ?? 'N/A') . "\n";
+            if ($formData['disponibilidadeInicio'] === 'Outra data' && !empty($formData['disponibilidadeOutraData'])) {
+                $textMessage .= "*Data:* " . date('d/m/Y', strtotime($formData['disponibilidadeOutraData'])) . "\n";
+            }
+            $textMessage .= "*Sábados:* " . ($formData['disponibilidadeSabados'] ?? 'N/A') . "\n";
+            $textMessage .= "*Horas Extras:* " . ($formData['disponibilidadeHorasExtras'] ?? 'N/A') . "\n\n";
+
+            $textMessage .= "*--- Pretensão Salarial ---*\n";
+            $textMessage .= "*Pretensão:* " . (!empty($formData['pretensaoSalarial']) ? $formData['pretensaoSalarial'] : 'Não informada') . "\n\n";
 
             $textMessage .= "*--- Experiência Profissional ---*\n";
             $textMessage .= "*Possui Experiência?:* " . ($formData['hasExperience'] ?? 'N/A') . "\n";
@@ -316,6 +419,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $textMessage .= "*Empresa " . ($i + 1) . ":* " . ($exp['company'] ?? 'N/A') . "\n";
                     $textMessage .= "*Cargo " . ($i + 1) . ":* " . ($exp['position'] ?? 'N/A') . "\n";
                     $textMessage .= "*Duração " . ($i + 1) . ":* " . ($exp['duration'] ?? 'N/A') . "\n";
+                    if (!empty($exp['atividades'])) {
+                        $textMessage .= "*Atividades " . ($i + 1) . ":* " . $exp['atividades'] . "\n";
+                    }
+                    if (!empty($exp['empregado_atual']) && $exp['empregado_atual'] === 'Sim') {
+                        $textMessage .= "*Trabalha atualmente " . ($i + 1) . ":* Sim\n";
+                        if (!empty($exp['motivo_saida_atual'])) {
+                            $textMessage .= "*Por que está saindo:* " . $exp['motivo_saida_atual'] . "\n";
+                        }
+                    } elseif (!empty($exp['motivo_saida'])) {
+                        $textMessage .= "*Motivo da saída " . ($i + 1) . ":* " . $exp['motivo_saida'] . "\n";
+                    }
+                }
+            }
+            if (!empty($formData['expectativaPrimeiroEmprego'])) {
+                $textMessage .= "*Expectativa 1º Emprego:* " . $formData['expectativaPrimeiroEmprego'] . "\n";
+            }
+            $textMessage .= "\n";
+
+            $textMessage .= "*--- Informações Complementares ---*\n";
+            $textMessage .= "*Como conheceu:* " . ($formData['comoConheceu'] ?? 'N/A') . "\n";
+            if ($formData['comoConheceu'] === 'Outro' && !empty($formData['comoConheceuOutro'])) {
+                $textMessage .= "*Detalhe:* " . $formData['comoConheceuOutro'] . "\n";
+            }
+            $referenciasArray = json_decode($formData['referencias'], true) ?: [];
+            if (!empty($referenciasArray)) {
+                foreach ($referenciasArray as $i => $ref) {
+                    $textMessage .= "*Referência " . ($i + 1) . ":* " . ($ref['nome'] ?? '') . " - " . ($ref['empresa'] ?? '') . " - " . ($ref['cargo'] ?? '') . " - " . ($ref['telefone'] ?? '') . "\n";
                 }
             }
             $textMessage .= "\n";
@@ -325,7 +455,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $textMessage .= "*--- Termos e Condições ---*\n";
             $textMessage .= "*Aceita os termos?:* " . ($formData['acceptTerms'] ?? 'N/A') . "\n";
-            $textMessage .= "*Horário da vaga:* " . ($formData['workSchedule'] ?? 'N/A') . "\n\n";
+            $textMessage .= "*Consentimento LGPD:* " . ($consentimentoLgpd_db ? 'Sim' : 'Não') . "\n";
+            $textMessage .= "*Banco de Talentos:* " . ($consentimentoBancoTalentos_db ? 'Sim' : 'Não') . "\n";
+            $textMessage .= "*Possível duplicata:* " . ($possivelDuplicata ? 'Sim ⚠️ (já existe cadastro com mesmo nome/data)' : 'Não') . "\n\n";
 
             $textMessage .= "*--- Redes Sociais ---*\n";
             $textMessage .= "*Facebook:* " . ($formData['facebook'] ?? 'N/A') . "\n";
