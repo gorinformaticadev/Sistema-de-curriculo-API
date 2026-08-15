@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
 // Buffer de saída para evitar que HTML/warnings corrompam a resposta JSON
 ob_start();
 
@@ -185,7 +185,7 @@ function sendApiTextMessage($token, $url, $number, $message) {
 
 /**
  * Envia mídia (foto/currículo) via API Pluggor.
- * POST /api/messages/send-media com multipart/form-data.
+ * MESMO endpoint do texto: POST /api/messages/send com multipart/form-data.
  * Campos: number, file, caption (opcional).
  * O tipo da mídia é identificado automaticamente pelo conteúdo.
  * Imagens: PNG, JPEG, GIF, WEBP | Documentos: PDF, DOCX, XLSX
@@ -217,21 +217,15 @@ function sendApiMediaMessage($token, $url, $number, $filePath, $fileName, $capti
         return false;
     }
 
-    // Endpoint de mídia derivado da URL configurada: /api/messages/send-media
-    $mediaUrl = str_replace('/messages/send', '/messages/send-media', $url);
-    if ($mediaUrl === $url) {
-        // Fallback: se a URL não contém o caminho padrão, concatena
-        $mediaUrl = rtrim($url, '/') . '/api/messages/send-media';
-    }
-
     // multipart: number + file + caption (o tipo é detectado pelo conteúdo)
+    // MESMO endpoint do envio de texto: /api/messages/send
     $cFile = new CURLFile($filePath, mime_content_type($filePath), $fileName);
     $data = [
         'number' => $number,
         'file' => $cFile,
         'caption' => $caption
     ];
-    $ch = curl_init($mediaUrl);
+    $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
