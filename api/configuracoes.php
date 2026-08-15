@@ -26,6 +26,13 @@ function apiSaveApiConfig($pdo, $configData) {
         foreach ($params as $param) {
             if (isset($_POST[$param])) {
                 $value = sanitizeInput($_POST[$param]);
+                if ($param === 'api_token') {
+                    // Campo mascarado (não alterado): mantém o token atual
+                    if (strpos($value, '•') !== false) {
+                        continue;
+                    }
+                    $value = tokenEncrypt($value);
+                }
                 $stmt->execute([$value, $param]);
                 $updated++;
             }

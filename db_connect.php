@@ -22,6 +22,9 @@ function loadEnv($path) {
 }
 loadEnv(__DIR__ . "/.env");
 
+// Funções de criptografia do token da API (Bearer)
+require_once __DIR__ . '/includes/crypto.php';
+
 // Configurações do Banco de Dados
 define('DB_HOST', getenv('DB_HOST') !== false ? getenv('DB_HOST') : 'localhost');
 define('DB_USER', getenv('DB_USER') !== false ? getenv('DB_USER') : 'gorinf79_curriculosgor');

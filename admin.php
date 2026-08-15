@@ -28,6 +28,18 @@ function loadConfigFromDB($pdo) {
     while ($row = $stmt->fetch()) {
         $config[$row['chave']] = $row['valor'];
     }
+    
+    // Descriptografa o token da API e migra tokens legados para criptografia
+    if (!empty($config['api_token']) && strpos($config['api_token'], 'enc:v1:') !== 0) {
+        $plain = $config['api_token'];
+        $encrypted = tokenEncrypt($plain);
+        $upd = $pdo->prepare("UPDATE config SET valor = ? WHERE chave = 'api_token'");
+        $upd->execute([$encrypted]);
+        $config['api_token'] = $plain;
+    } elseif (!empty($config['api_token'])) {
+        $config['api_token'] = tokenDecrypt($config['api_token']);
+    }
+    
     return $config;
 }
 
@@ -380,7 +392,15 @@ if (isAdmin()) {
         $stmt = $pdo->prepare("UPDATE config SET valor = ? WHERE chave = ?");
         foreach ($params as $param) {
             if (isset($_POST[$param])) {
-                $stmt->execute([$_POST[$param], $param]);
+                $value = $_POST[$param];
+                if ($param === 'api_token') {
+                    // Campo mascarado (não alterado): mantém o token atual
+                    if (strpos($value, '\u{2022}') !== false || strpos($value, '•') !== false) {
+                        continue;
+                    }
+                    $value = tokenEncrypt($value);
+                }
+                $stmt->execute([$value, $param]);
                 $updated++;
             }
         }
@@ -2169,7 +2189,8 @@ $totalCurriculos = $stmt->fetchColumn();
                         </div>
                         <div class="form-group">
                             <label>Token "Bearer"</label>
-                            <input type="text" id="apiToken" name="api_token" value="<?php echo htmlspecialchars($config['api_token']); ?>">
+                            <input type="text" id="apiToken" name="api_token" value="<?php echo htmlspecialchars(tokenMask($config['api_token'] ?? '')); ?>" placeholder="pg_seutoken...">
+                            <small>Por segurança, o token completo não é exibido. Para manter o token atual, deixe este campo como está.</small>
                         </div>
                         <div class="form-group">
                             <label>Número para Notificações</label>

@@ -4,6 +4,9 @@
  * Arquivo responsável pela conexão PDO e carregamento de configurações
  */
 
+// Funções de criptografia do token da API (Bearer)
+require_once dirname(__DIR__) . '/includes/crypto.php';
+
 class Database {
     private static $instance = null;
     private $pdo;
@@ -51,6 +54,17 @@ class Database {
         $stmt = $this->pdo->query("SELECT chave, valor FROM config");
         while ($row = $stmt->fetch()) {
             $config[$row['chave']] = $row['valor'];
+        }
+        
+        // Descriptografa o token da API e migra tokens legados para criptografia
+        if (!empty($config['api_token']) && strpos($config['api_token'], 'enc:v1:') !== 0) {
+            $plain = $config['api_token'];
+            $encrypted = tokenEncrypt($plain);
+            $upd = $this->pdo->prepare("UPDATE config SET valor = ? WHERE chave = 'api_token'");
+            $upd->execute([$encrypted]);
+            $config['api_token'] = $plain;
+        } elseif (!empty($config['api_token'])) {
+            $config['api_token'] = tokenDecrypt($config['api_token']);
         }
         
         // Configurações padrão se não existirem no banco
