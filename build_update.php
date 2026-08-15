@@ -85,6 +85,32 @@ if ($zip->open($zipName, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
     echo " Arquivo: builds/update_v{$version}.zip\n";
     echo " Total de arquivos inclusos: {$count}\n";
     echo "========================================\n";
+
+    // Registrar a versao no banco de dados local (para exibir no painel admin)
+    try {
+        require_once __DIR__ . '/db_connect.php';
+        $info = 'Gerado em ' . date('d/m/Y H:i:s') . ' - ' . $notes;
+
+        $stmt = $pdo->prepare("SELECT id FROM config WHERE chave = 'system_version'");
+        $stmt->execute();
+        if ($stmt->fetch()) {
+            $pdo->prepare("UPDATE config SET valor = ? WHERE chave = 'system_version'")->execute([$version]);
+        } else {
+            $pdo->prepare("INSERT INTO config (chave, valor) VALUES ('system_version', ?)")->execute([$version]);
+        }
+
+        $stmt2 = $pdo->prepare("SELECT id FROM config WHERE chave = 'system_version_info'");
+        $stmt2->execute();
+        if ($stmt2->fetch()) {
+            $pdo->prepare("UPDATE config SET valor = ? WHERE chave = 'system_version_info'")->execute([$info]);
+        } else {
+            $pdo->prepare("INSERT INTO config (chave, valor) VALUES ('system_version_info', ?)")->execute([$info]);
+        }
+
+        echo " Versao {$version} registrada no banco de dados local.\n";
+    } catch (Exception $e) {
+        echo " Aviso: nao foi possivel registrar a versao no banco local: " . $e->getMessage() . "\n";
+    }
 } else {
     echo "Erro ao criar o arquivo .zip. Verifique as permissões da pasta.\n";
 }

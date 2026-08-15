@@ -44,7 +44,9 @@ $defaultConfigs = [
     'smtp_user' => '',
     'smtp_pass' => '',
     'smtp_from' => 'noreply@gorinformatica.com.br',
-    'notification_email' => 'rh@gorinformatica.com.br'
+    'notification_email' => 'rh@gorinformatica.com.br',
+    'system_version' => '',
+    'system_version_info' => ''
 ];
 
 foreach ($defaultConfigs as $key => $value) {
@@ -1422,6 +1424,35 @@ if (isAdmin()) {
                 logError('Migrações não executadas na instalação: curl indisponível e classe não carregada.', 'ERROR');
             }
 
+            // 3.3 Registrar a versão instalada (lida do manifest.json do pacote)
+            $installedVersion = '';
+            if (file_exists($sourceDir . 'manifest.json')) {
+                $manifestData = json_decode(file_get_contents($sourceDir . 'manifest.json'), true);
+                $installedVersion = is_array($manifestData) ? ($manifestData['version'] ?? '') : '';
+            }
+            if ($installedVersion !== '') {
+                try {
+                    $stmtVersion = $pdo->prepare("SELECT id FROM config WHERE chave = 'system_version'");
+                    $stmtVersion->execute();
+                    if ($stmtVersion->fetch()) {
+                        $pdo->prepare("UPDATE config SET valor = ? WHERE chave = 'system_version'")->execute([$installedVersion]);
+                    } else {
+                        $pdo->prepare("INSERT INTO config (chave, valor) VALUES ('system_version', ?)")->execute([$installedVersion]);
+                    }
+                    $infoVersao = 'Instalada em ' . date('d/m/Y H:i:s');
+                    $stmtInfo = $pdo->prepare("SELECT id FROM config WHERE chave = 'system_version_info'");
+                    $stmtInfo->execute();
+                    if ($stmtInfo->fetch()) {
+                        $pdo->prepare("UPDATE config SET valor = ? WHERE chave = 'system_version_info'")->execute([$infoVersao]);
+                    } else {
+                        $pdo->prepare("INSERT INTO config (chave, valor) VALUES ('system_version_info', ?)")->execute([$infoVersao]);
+                    }
+                    $dbMessages[] = "versão {$installedVersion} registrada";
+                } catch (Exception $e) {
+                    logError('Erro ao registrar versão instalada: ' . $e->getMessage(), 'ERROR');
+                }
+            }
+
             // 4. Limpar temporários
             function deleteDir($dirPath) {
                 if (!is_dir($dirPath)) return;
@@ -2257,6 +2288,10 @@ $totalCurriculos = $stmt->fetchColumn();
                 <div id="updates-tab" class="tab-content">
                     <div class="form-section">
                         <h3><i class="fas fa-upload"></i> Atualização do Sistema (.zip)</h3>
+                        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-left:5px solid #1e40af;border-radius:8px;padding:14px 18px;margin-bottom:15px;">
+                            <i class="fas fa-tag"></i> <strong>Versão instalada:</strong> <?php echo htmlspecialchars(!empty($config['system_version']) ? $config['system_version'] : 'Não registrada'); ?>
+                            <?php if (!empty($config['system_version_info'])): ?><br><small style="color:#1e3a8a;"><?php echo htmlspecialchars($config['system_version_info']); ?></small><?php endif; ?>
+                        </div>
                         <p>Faça upload de um pacote de atualização oficial para instalar novas funcionalidades. Um backup será feito automaticamente antes da instalação.</p>
                         
                         <form id="uploadUpdateForm" style="margin-top: 20px;">
