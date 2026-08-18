@@ -182,19 +182,32 @@ class FormTracker {
         const form = document.getElementById('curriculumForm');
         if (!form) return;
 
-        // Rastrear inputs de texto - usar BLUR para garantir captura quando sair do campo
+        // Função auxiliar para atualizar o último campo em tempo real enquanto digita (evita perda de estado se fechar sem dar blur)
+        const updateCurrentFieldRealtime = (e) => {
+            if (e.target.value && e.target.value.trim() !== '') {
+                const fieldName = e.target.name || e.target.id || 'unknown';
+                const fieldLabel = this.getFieldLabel(e.target);
+                this.lastField = fieldLabel || fieldName;
+                if (fieldName === 'name') {
+                    this.userName = e.target.value.trim();
+                }
+                this.updatePersistentData();
+            }
+        };
+
+        // Rastrear inputs de texto - usar INPUT (tempo real) + BLUR (registro formal)
         form.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="date"]').forEach(input => {
-            // Usar blur ao invés de change para garantir que capture quando o usuário sair do campo
+            input.addEventListener('input', updateCurrentFieldRealtime);
             input.addEventListener('blur', (e) => {
-                // Só registrar se tiver valor
                 if (e.target.value && e.target.value.trim() !== '') {
                     this.logInteraction(e.target, 'change');
                 }
             });
         });
 
-        // Rastrear textareas - usar BLUR
+        // Rastrear textareas - usar INPUT + BLUR
         form.querySelectorAll('textarea').forEach(textarea => {
+            textarea.addEventListener('input', updateCurrentFieldRealtime);
             textarea.addEventListener('blur', (e) => {
                 if (e.target.value && e.target.value.trim() !== '') {
                     this.logInteraction(e.target, 'change');

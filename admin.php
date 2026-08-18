@@ -632,20 +632,22 @@ if (isAdmin()) {
                             (SELECT fi2.ultimo_campo FROM form_interactions fi2 
                              WHERE fi2.session_id = fi.session_id 
                              AND fi2.acao = 'form_abandoned' 
-                             LIMIT 1),
-                            fi.ultimo_campo
+                             AND fi2.ultimo_campo IS NOT NULL AND fi2.ultimo_campo != '' AND fi2.ultimo_campo != 'Acesso ao Formulário'
+                             ORDER BY fi2.id DESC LIMIT 1),
+                            (SELECT fi3.ultimo_campo FROM form_interactions fi3 
+                             WHERE fi3.session_id = fi.session_id 
+                             AND fi3.ultimo_campo IS NOT NULL AND fi3.ultimo_campo != '' AND fi3.ultimo_campo != 'Acesso ao Formulário' AND fi3.ultimo_campo != 'form_access'
+                             ORDER BY fi3.id DESC LIMIT 1)
                         ) as ultimo_campo
                     FROM form_interactions fi
-                    WHERE fi.ultimo_campo IS NOT NULL
-                    AND fi.ultimo_campo != ''
-                    AND fi.ultimo_campo != 'Acesso ao Formulário'
-                    AND fi.session_id NOT IN (
+                    WHERE fi.session_id NOT IN (
                         SELECT DISTINCT session_id 
                         FROM form_interactions 
                         WHERE acao IN ('form_submitted', 'form_submit_click')
                     )
                     GROUP BY fi.session_id
                 ) as abandoned_sessions
+                WHERE ultimo_campo IS NOT NULL AND ultimo_campo != '' AND ultimo_campo != 'Acesso ao Formulário'
                 GROUP BY ultimo_campo
                 ORDER BY count DESC
                 LIMIT 10
@@ -679,7 +681,7 @@ if (isAdmin()) {
             // Filtro de período
             switch ($period) {
                 case 'today':
-                    $where[] = "DATE(timestamp) = CURDATE()";
+                    $where[] = "timestamp >= DATE_SUB(NOW(), INTERVAL 1 DAY)";
                     break;
                 case 'week':
                     $where[] = "timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
@@ -703,22 +705,39 @@ if (isAdmin()) {
 
             $whereClause = implode(" AND ", $where);
 
-            // Buscar sessões agrupadas
+            // Buscar sessões agrupadas garantindo a busca do NOME REAL e do ÚLTIMO CAMPO REAL da sessão
             $stmt = $pdo->prepare("
                 SELECT 
-                    session_id,
-                    ip,
-                    browser,
-                    os,
-                    device,
-                    nome_completo,
-                    ultimo_campo,
-                    MIN(timestamp) as first_interaction,
-                    MAX(timestamp) as last_interaction,
+                    fi.session_id,
+                    fi.ip,
+                    fi.browser,
+                    fi.os,
+                    fi.device,
+                    COALESCE(
+                        (SELECT fi_name.nome_completo FROM form_interactions fi_name 
+                         WHERE fi_name.session_id = fi.session_id 
+                         AND fi_name.nome_completo IS NOT NULL AND fi_name.nome_completo != '' 
+                         ORDER BY fi_name.id DESC LIMIT 1),
+                        fi.nome_completo
+                    ) as nome_completo,
+                    COALESCE(
+                        (SELECT fi2.ultimo_campo FROM form_interactions fi2 
+                         WHERE fi2.session_id = fi.session_id 
+                         AND fi2.acao = 'form_abandoned' 
+                         AND fi2.ultimo_campo IS NOT NULL AND fi2.ultimo_campo != '' AND fi2.ultimo_campo != 'Acesso ao Formulário'
+                         ORDER BY fi2.id DESC LIMIT 1),
+                        (SELECT fi3.ultimo_campo FROM form_interactions fi3 
+                         WHERE fi3.session_id = fi.session_id 
+                         AND fi3.ultimo_campo IS NOT NULL AND fi3.ultimo_campo != '' AND fi3.ultimo_campo != 'Acesso ao Formulário' AND fi3.ultimo_campo != 'form_access'
+                         ORDER BY fi3.id DESC LIMIT 1),
+                        fi.ultimo_campo
+                    ) as ultimo_campo,
+                    MIN(fi.timestamp) as first_interaction,
+                    MAX(fi.timestamp) as last_interaction,
                     COUNT(*) as interaction_count
-                FROM form_interactions
+                FROM form_interactions fi
                 WHERE $whereClause
-                GROUP BY session_id
+                GROUP BY fi.session_id
                 ORDER BY last_interaction DESC
                 LIMIT 50
             ");

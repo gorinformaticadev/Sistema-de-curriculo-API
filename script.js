@@ -1,4 +1,4 @@
-﻿// ============ POLYFILLS DE COMPATIBILIDADE (Android/iOS/navegadores antigos) ============
+// ============ POLYFILLS DE COMPATIBILIDADE (Android/iOS/navegadores antigos) ============
 
 // Array.prototype.includes (Chrome <47, Safari <9)
 if (!Array.prototype.includes) {
@@ -998,7 +998,8 @@ function showValidationSummary(errors) {
 
 function validateForm() {
     const errors = [];
-    const maxFileSize = 15 * 1024 * 1024; // 15MB
+    const maxFileSize = 20 * 1024 * 1024; // 20MB por arquivo
+    const maxTotalSize = 30 * 1024 * 1024; // 30MB total
     const addError = (name, msg) => {
         markFieldError(curriculumForm.querySelector(`[name="${name}"]`));
         errors.push(msg);
@@ -1118,27 +1119,39 @@ function validateForm() {
     if (isSectionVisible('filesSection')) {
         const resume = curriculumForm.querySelector('input[name="resume"]');
         const photo = curriculumForm.querySelector('input[name="photo"]');
+        let resumeSize = 0;
+        let photoSize = 0;
+
         if (!resume.files || resume.files.length === 0) {
             addError('resume', 'Anexe o currículo em PDF.');
         } else {
             const file = resume.files[0];
+            resumeSize = file.size;
+            const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
             if (!file.name.toLowerCase().endsWith('.pdf')) {
                 addError('resume', 'O currículo deve ser um arquivo PDF.');
             } else if (file.size > maxFileSize) {
-                addError('resume', 'O currículo é muito grande. Tamanho máximo: 15MB.');
+                addError('resume', `O currículo (${fileSizeMB}MB) é muito grande. O limite máximo por arquivo é de 20MB.`);
             }
         }
         if (!photo.files || photo.files.length === 0) {
             addError('photo', 'Anexe uma foto.');
         } else {
             const file = photo.files[0];
+            photoSize = file.size;
+            const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
             const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'heic', 'heif'];
             const extension = file.name.split('.').pop().toLowerCase();
             if (!allowedExtensions.includes(extension)) {
                 addError('photo', 'A foto deve ser JPG, JPEG, PNG, GIF ou HEIC (iPhone).');
             } else if (file.size > maxFileSize) {
-                addError('photo', 'A foto é muito grande. Tamanho máximo: 15MB.');
+                addError('photo', `A foto (${fileSizeMB}MB) é muito grande. O limite máximo por arquivo é de 20MB.`);
             }
+        }
+
+        if (resumeSize > 0 && photoSize > 0 && (resumeSize + photoSize) > maxTotalSize) {
+            const totalMB = ((resumeSize + photoSize) / (1024 * 1024)).toFixed(1);
+            addError('resume', `O tamanho total dos arquivos (${totalMB}MB) ultrapassa o limite recomendado de 30MB. Reduza o tamanho da foto ou do PDF antes de enviar.`);
         }
     }
 

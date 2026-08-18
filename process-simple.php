@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<?php
 // Buffer de saída para evitar que HTML/warnings corrompam a resposta JSON
 ob_start();
 
@@ -121,12 +121,20 @@ function cleanPhoneNumber($phone) {
 
 function uploadFile($file, $allowedTypes, $prefix = '') {
     $uploadDir = 'uploads/';
-    $maxFileSize = 15 * 1024 * 1024;
-
+    $maxFileSize = 20 * 1024 * 1024; // 20MB por arquivo
 
     if (!file_exists($uploadDir)) mkdir($uploadDir, 0777, true);
-    if ($file['error'] !== UPLOAD_ERR_OK) throw new Exception('Erro no upload: ' . $file['error']);
-    if ($file['size'] > $maxFileSize) throw new Exception('Arquivo muito grande (Max 15MB)');
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        if ($file['error'] === UPLOAD_ERR_INI_SIZE || $file['error'] === UPLOAD_ERR_FORM_SIZE) {
+            throw new Exception('O arquivo enviado ultrapassa o limite máximo permitido pelo servidor (20MB). Por favor, reduza o tamanho do arquivo.');
+        }
+        throw new Exception('Erro no upload do arquivo: Código ' . $file['error']);
+    }
+    
+    $fileSizeMB = number_format($file['size'] / (1024 * 1024), 1);
+    if ($file['size'] > $maxFileSize) {
+        throw new Exception("O arquivo enviado ($fileSizeMB MB) excede o limite máximo permitido de 20MB.");
+    }
     
     $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     if (!in_array($extension, $allowedTypes)) throw new Exception('Tipo de arquivo não permitido: ' . $extension);
@@ -134,7 +142,7 @@ function uploadFile($file, $allowedTypes, $prefix = '') {
     $fileName = $prefix . '_' . uniqid() . '.' . $extension;
     $filePath = $uploadDir . $fileName;
     
-    if (!move_uploaded_file($file['tmp_name'], $filePath)) throw new Exception('Erro ao salvar arquivo');
+    if (!move_uploaded_file($file['tmp_name'], $filePath)) throw new Exception('Erro ao salvar arquivo na pasta uploads.');
     
     return $fileName;
 }
