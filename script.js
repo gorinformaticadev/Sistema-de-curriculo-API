@@ -1417,7 +1417,7 @@ function sendCurriculum(formData, name, resumeFile, photoFile) {
             console.log('🎉 Currículo enviado com sucesso!');
         } else {
             console.error('❌ Erro retornado pelo servidor:', data.message);
-            alert('❌ Erro ao enviar currículo: ' + data.message + '\n\nSe o problema persistir, entre em contato pelo WhatsApp (61) 3359-7358.');
+            showErrorModal(data.message);
         }
     })
     .catch(error => {
@@ -1444,15 +1444,14 @@ function sendCurriculum(formData, name, resumeFile, photoFile) {
                          'Tente novamente em alguns instantes.';
         } else if (error.message.includes('HTTP')) {
             errorMessage = error.message;
-            userMessage = '⚠️ Erro no servidor:\n\n' + error.message + '\n\n' +
-                         'Entre em contato com o suporte informando este erro.';
+            userMessage = '⚠️ Erro no servidor:\n\n' + error.message;
         } else {
             errorMessage = error.message;
             userMessage = '❌ Erro ao processar sua solicitação:\n\n' + error.message;
         }
         
         console.error('📋 Diagnóstico:', errorMessage);
-        alert(userMessage + '\n\n📞 Suporte: WhatsApp (61) 3359-7358');
+        showErrorModal(userMessage);
     })
     .finally(() => {
         // Reset button
@@ -1460,6 +1459,34 @@ function sendCurriculum(formData, name, resumeFile, photoFile) {
         submitBtn.disabled = false;
         console.log('🔄 Botão resetado');
     });
+}
+
+function showErrorModal(message) {
+    const modal = document.getElementById('errorModal');
+    const msgEl = document.getElementById('errorModalMessage');
+    const waLink = document.getElementById('errorWhatsappLink');
+
+    if (msgEl) {
+        msgEl.textContent = message || 'Erro desconhecido ao processar o envio.';
+    }
+
+    if (waLink) {
+        const text = encodeURIComponent("Olá! Ocorreu um erro ao enviar meu currículo pelo site.\n\nErro: " + (message || 'Erro no envio') + "\n\nEstou enviando em anexo meu nome completo, foto e currículo para inserção no sistema.");
+        waLink.href = "https://wa.me/556133597358?text=" + text;
+    }
+
+    if (modal) {
+        modal.style.display = 'block';
+    } else {
+        alert('❌ Erro no envio:\n\n' + message + '\n\n📌 Para que possamos registrar a sua solicitação do currículo, nos envie um print do Erro, seu nome completo, a foto e o currículo, para te inserirmos no sistema.\n\nWhatsApp: (61) 3359-7358');
+    }
+}
+
+function closeErrorModal() {
+    const modal = document.getElementById('errorModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
 
 // Phone number formatting
