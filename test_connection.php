@@ -34,13 +34,27 @@ try {
     echo "✅ <strong>Total de Usuários Admin:</strong> " . $stmt3->fetchColumn() . "<br>";
 
 } catch (Throwable $t) {
-    echo "❌ <strong style='color:red;'>ERRO CRÍTICO:</strong> " . htmlspecialchars($t->getMessage()) . "<br>";
+    echo "❌ <strong style='color:red;'>ERRO CRÍTICO NO BANCO:</strong> " . htmlspecialchars($t->getMessage()) . "<br>";
     echo "<strong>Arquivo:</strong> " . $t->getFile() . " (linha " . $t->getLine() . ")<br>";
     echo "<pre>" . htmlspecialchars($t->getTraceAsString()) . "</pre>";
 }
 
-// 3. Testar error.log
-echo "<h3>3. Últimas Linhas do error.log</h3>";
+// 3. Teste de execução do admin.php
+echo "<h3>3. Teste de Execução do admin.php</h3>";
+try {
+    ob_start();
+    include_once 'admin.php';
+    $adminHtml = ob_get_clean();
+    echo "✅ <strong>admin.php executou perfeitamente sem erros!</strong> (Tamanho retornado: " . strlen($adminHtml) . " bytes)<br>";
+} catch (Throwable $at) {
+    if (ob_get_level()) ob_end_clean();
+    echo "❌ <strong style='color:red;'>ERRO CRÍTICO AO CARREGAR ADMIN.PHP:</strong> " . htmlspecialchars($at->getMessage()) . "<br>";
+    echo "<strong>Arquivo:</strong> " . $at->getFile() . " (linha " . $at->getLine() . ")<br>";
+    echo "<pre>" . htmlspecialchars($at->getTraceAsString()) . "</pre>";
+}
+
+// 4. Testar error.log
+echo "<h3>4. Últimas Linhas do error.log</h3>";
 if (file_exists('error.log')) {
     $lines = file('error.log');
     $lastLines = array_slice($lines, -10);
