@@ -612,7 +612,6 @@ if (isAdmin()) {
         
         try {
             // Buscar último campo de cada sessão que NÃO completou o formulário
-            // Prioriza o campo registrado no evento form_abandoned (que tem o campo real)
             $stmt = $pdo->query("
                 SELECT 
                     ultimo_campo,
@@ -620,24 +619,22 @@ if (isAdmin()) {
                 FROM (
                     SELECT 
                         fi.session_id,
-                        COALESCE(
-                            (SELECT fi2.ultimo_campo FROM form_interactions fi2 
-                             WHERE fi2.session_id = fi.session_id 
-                             AND fi2.acao = 'form_abandoned' 
-                             LIMIT 1),
-                            fi.ultimo_campo
-                        ) as ultimo_campo
+                        (SELECT fi2.ultimo_campo 
+                         FROM form_interactions fi2 
+                         WHERE fi2.session_id = fi.session_id 
+                         AND fi2.ultimo_campo IS NOT NULL 
+                         AND fi2.ultimo_campo != '' 
+                         AND fi2.ultimo_campo NOT IN ('Acesso ao Formulário', 'form_access') 
+                         ORDER BY fi2.id DESC LIMIT 1) as ultimo_campo
                     FROM form_interactions fi
-                    WHERE fi.ultimo_campo IS NOT NULL
-                    AND fi.ultimo_campo != ''
-                    AND fi.ultimo_campo != 'Acesso ao Formulário'
-                    AND fi.session_id NOT IN (
+                    WHERE fi.session_id NOT IN (
                         SELECT DISTINCT session_id 
                         FROM form_interactions 
                         WHERE acao IN ('form_submitted', 'form_submit_click')
                     )
                     GROUP BY fi.session_id
                 ) as abandoned_sessions
+                WHERE ultimo_campo IS NOT NULL AND ultimo_campo != ''
                 GROUP BY ultimo_campo
                 ORDER BY count DESC
                 LIMIT 10
@@ -671,7 +668,7 @@ if (isAdmin()) {
             // Filtro de período
             switch ($period) {
                 case 'today':
-                    $where[] = "DATE(timestamp) = CURDATE()";
+                    $where[] = "timestamp >= DATE_SUB(NOW(), INTERVAL 1 DAY)";
                     break;
                 case 'week':
                     $where[] = "timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
@@ -695,16 +692,16 @@ if (isAdmin()) {
 
             $whereClause = implode(" AND ", $where);
 
-            // Buscar sessões agrupadas
+            // 1. Buscar sessões agrupadas (compatível com ONLY_FULL_GROUP_BY)
             $stmt = $pdo->prepare("
                 SELECT 
                     session_id,
-                    ip,
-                    browser,
-                    os,
-                    device,
-                    nome_completo,
-                    ultimo_campo,
+                    MAX(ip) as ip,
+                    MAX(browser) as browser,
+                    MAX(os) as os,
+                    MAX(device) as device,
+                    MAX(nome_completo) as nome_completo,
+                    MAX(ultimo_campo) as ultimo_campo,
                     MIN(timestamp) as first_interaction,
                     MAX(timestamp) as last_interaction,
                     COUNT(*) as interaction_count
@@ -718,27 +715,42 @@ if (isAdmin()) {
             $stmt->execute($params);
             $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Para cada sessão, verificar se foi completada
+            // 2. Enriquecimento dos dados em PHP para obter nome real, último campo real e status
             foreach ($sessions as &$session) {
+                // Nome completo real (se nulo no agrupador)
+                if (empty($session['nome_completo'])) {
+                    $stmtName = $pdo->prepare("SELECT nome_completo FROM form_interactions WHERE session_id = ? AND nome_completo IS NOT NULL AND nome_completo != '' ORDER BY id DESC LIMIT 1");
+                    $stmtName->execute([$session['session_id']]);
+                    $session['nome_completo'] = $stmtName->fetchColumn() ?: '';
+                }
+
+                // Último campo real (excluindo rótulos genéricos de acesso)
+                $stmtField = $pdo->prepare("SELECT ultimo_campo FROM form_interactions WHERE session_id = ? AND ultimo_campo IS NOT NULL AND ultimo_campo != '' AND ultimo_campo NOT IN ('Acesso ao Formulário', 'form_access') ORDER BY id DESC LIMIT 1");
+                $stmtField->execute([$session['session_id']]);
+                $realLastField = $stmtField->fetchColumn();
+                if ($realLastField) {
+                    $session['ultimo_campo'] = $realLastField;
+                }
+
                 // 1. Verificar se existe currículo cadastrado próximo ao horário da sessão
-                $stmt = $pdo->prepare("
+                $stmtCur = $pdo->prepare("
                     SELECT id FROM curriculos 
                     WHERE ip_cadastro = ? 
                     AND ABS(TIMESTAMPDIFF(MINUTE, data_cadastro, ?)) <= 30
                     LIMIT 1
                 ");
-                $stmt->execute([$session['ip'], $session['last_interaction']]);
-                $hasCurriculo = $stmt->rowCount() > 0;
+                $stmtCur->execute([$session['ip'], $session['last_interaction']]);
+                $hasCurriculo = $stmtCur->rowCount() > 0;
 
                 // 2. Verificar se houve clique no botão de finalizar (ação 'form_submitted')
-                $stmt2 = $pdo->prepare("
+                $stmtSub = $pdo->prepare("
                     SELECT 1 FROM form_interactions 
                     WHERE session_id = ? 
                     AND acao = 'form_submitted' 
                     LIMIT 1
                 ");
-                $stmt2->execute([$session['session_id']]);
-                $hasSubmitAction = $stmt2->rowCount() > 0;
+                $stmtSub->execute([$session['session_id']]);
+                $hasSubmitAction = $stmtSub->rowCount() > 0;
 
                 $session['completed'] = $hasCurriculo || $hasSubmitAction;
             }
