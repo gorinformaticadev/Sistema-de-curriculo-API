@@ -43,30 +43,35 @@ function loadConfigFromDB($pdo) {
     return $config;
 }
 
-$config = loadConfigFromDB($pdo);
+$config = [];
+try {
+    $config = loadConfigFromDB($pdo);
 
-// Garantir que configurações padrão existam
-$defaultConfigs = [
-    'api_token' => '',
-    'api_url' => 'https://app.pluggor.com.br/api/messages/send',
-    'notification_number' => '5500000000000',
-    'completion_message' => 'Olá {nome}! Obrigado por se cadastrar no nosso sistema. Seu currículo foi recebido com sucesso e entraremos em contato em breve.',
-    'smtp_host' => 'smtp.gmail.com',
-    'smtp_port' => '587',
-    'smtp_user' => '',
-    'smtp_pass' => '',
-    'smtp_from' => 'noreply@gorinformatica.com.br',
-    'notification_email' => 'rh@gorinformatica.com.br',
-    'system_version' => '',
-    'system_version_info' => ''
-];
+    // Garantir que configurações padrão existam
+    $defaultConfigs = [
+        'api_token' => '',
+        'api_url' => 'https://app.pluggor.com.br/api/messages/send',
+        'notification_number' => '5500000000000',
+        'completion_message' => 'Olá {nome}! Obrigado por se cadastrar no nosso sistema. Seu currículo foi recebido com sucesso e entraremos em contato em breve.',
+        'smtp_host' => 'smtp.gmail.com',
+        'smtp_port' => '587',
+        'smtp_user' => '',
+        'smtp_pass' => '',
+        'smtp_from' => 'noreply@gorinformatica.com.br',
+        'notification_email' => 'rh@gorinformatica.com.br',
+        'system_version' => '',
+        'system_version_info' => ''
+    ];
 
-foreach ($defaultConfigs as $key => $value) {
-    if (!isset($config[$key])) {
-        $stmt = $pdo->prepare("INSERT INTO config (chave, valor) VALUES (?, ?)");
-        $stmt->execute([$key, $value]);
-        $config[$key] = $value;
+    foreach ($defaultConfigs as $key => $value) {
+        if (!isset($config[$key])) {
+            $stmt = $pdo->prepare("INSERT INTO config (chave, valor) VALUES (?, ?)");
+            $stmt->execute([$key, $value]);
+            $config[$key] = $value;
+        }
     }
+} catch (Exception $cfgErr) {
+    logError("Erro ao carregar configurações do banco no admin.php: " . $cfgErr->getMessage(), 'ERROR');
 }
 
 // Verificar se é admin

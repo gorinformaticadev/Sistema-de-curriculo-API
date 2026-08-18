@@ -45,11 +45,17 @@ if (!function_exists('tokenEncrypt')) {
         if (strpos($plain, 'enc:v1:') === 0) {
             return $plain;
         }
+        if (!function_exists('openssl_encrypt') || !function_exists('openssl_random_pseudo_bytes')) {
+            return $plain;
+        }
         $key = getEncryptionKey();
-        $iv = openssl_random_pseudo_bytes(16);
-        $cipher = openssl_encrypt($plain, 'AES-256-CBC', $key, 0, $iv);
+        $iv = @openssl_random_pseudo_bytes(16);
+        if ($iv === false || strlen($iv) < 16) {
+            return $plain;
+        }
+        $cipher = @openssl_encrypt($plain, 'AES-256-CBC', $key, 0, $iv);
         if ($cipher === false) {
-            // Falha de criptografia (openssl indisponível): mantém texto puro
+            // Falha de criptografia: mantém texto puro
             return $plain;
         }
         return 'enc:v1:' . base64_encode($iv . $cipher);
@@ -65,13 +71,16 @@ if (!function_exists('tokenDecrypt')) {
         if (strpos($value, 'enc:v1:') !== 0) {
             return $value;
         }
+        if (!function_exists('openssl_decrypt')) {
+            return $value;
+        }
         $data = base64_decode(substr($value, strlen('enc:v1:')));
         if ($data === false || strlen($data) < 17) {
             return $value;
         }
         $iv = substr($data, 0, 16);
         $cipher = substr($data, 16);
-        $plain = openssl_decrypt($cipher, 'AES-256-CBC', getEncryptionKey(), 0, $iv);
+        $plain = @openssl_decrypt($cipher, 'AES-256-CBC', getEncryptionKey(), 0, $iv);
         return ($plain === false) ? $value : $plain;
     }
 }
