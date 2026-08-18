@@ -494,7 +494,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach ($phones_clean as $index => $phone) {
                     if ($whatsapps[$index] === 'Sim') {
                         // Adicionar código do país se não tiver
-                        if (!str_starts_with($phone, '55')) {
+                        if (strpos($phone, '55') !== 0) {
                             $phone = '55' . $phone;
                         }
                         $success = sendApiTextMessage($config['api_token'], $config['api_url'], $phone, $completionMessage);
@@ -675,8 +675,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
 
-    } catch (Exception $e) {
-        logError("ERRO NO PROCESSAMENTO: " . $e->getMessage());
+    } catch (Throwable $e) {
+        logError("ERRO NO PROCESSAMENTO: " . $e->getMessage() . " em " . $e->getFile() . " linha " . $e->getLine());
         sendJson(['success' => false, 'message' => $e->getMessage()], 400);
     }
 } else {
