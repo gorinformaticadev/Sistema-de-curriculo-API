@@ -14,14 +14,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     exit;
 }
 
-// Aceita apenas chamadas locais (do próprio servidor)
+session_start();
+
+// Aceita chamadas locais do próprio servidor, chamadas do atualizador (chave 'internal') ou sessão de admin
 $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
 $serverAddr = $_SERVER['SERVER_ADDR'] ?? '';
-$allowed = ['127.0.0.1', '::1'];
-if ($serverAddr !== '') {
-    $allowed[] = $serverAddr;
-}
-if (!in_array($remoteAddr, $allowed, true)) {
+$isInternalKey = (isset($_POST['key']) && $_POST['key'] === 'internal');
+$isAdminUser = (isset($_SESSION['admin']) && $_SESSION['admin'] === true);
+$isLoopback = in_array($remoteAddr, ['127.0.0.1', '::1', $serverAddr], true);
+
+if (!$isInternalKey && !$isAdminUser && !$isLoopback) {
     http_response_code(403);
     echo json_encode(['success' => false, 'errors' => ['Acesso negado: endpoint restrito ao próprio servidor.']]);
     exit;
