@@ -705,20 +705,20 @@ if (isAdmin()) {
 
             $whereClause = implode(" AND ", $where);
 
-            // Buscar sessões agrupadas garantindo a busca do NOME REAL e do ÚLTIMO CAMPO REAL da sessão
+            // Buscar sessões agrupadas garantindo a busca do NOME REAL e do ÚLTIMO CAMPO REAL da sessão (compatível com ONLY_FULL_GROUP_BY)
             $stmt = $pdo->prepare("
                 SELECT 
                     fi.session_id,
-                    fi.ip,
-                    fi.browser,
-                    fi.os,
-                    fi.device,
+                    MAX(fi.ip) as ip,
+                    MAX(fi.browser) as browser,
+                    MAX(fi.os) as os,
+                    MAX(fi.device) as device,
                     COALESCE(
                         (SELECT fi_name.nome_completo FROM form_interactions fi_name 
                          WHERE fi_name.session_id = fi.session_id 
                          AND fi_name.nome_completo IS NOT NULL AND fi_name.nome_completo != '' 
                          ORDER BY fi_name.id DESC LIMIT 1),
-                        fi.nome_completo
+                        MAX(fi.nome_completo)
                     ) as nome_completo,
                     COALESCE(
                         (SELECT fi2.ultimo_campo FROM form_interactions fi2 
@@ -730,7 +730,7 @@ if (isAdmin()) {
                          WHERE fi3.session_id = fi.session_id 
                          AND fi3.ultimo_campo IS NOT NULL AND fi3.ultimo_campo != '' AND fi3.ultimo_campo != 'Acesso ao Formulário' AND fi3.ultimo_campo != 'form_access'
                          ORDER BY fi3.id DESC LIMIT 1),
-                        fi.ultimo_campo
+                        MAX(fi.ultimo_campo)
                     ) as ultimo_campo,
                     MIN(fi.timestamp) as first_interaction,
                     MAX(fi.timestamp) as last_interaction,
