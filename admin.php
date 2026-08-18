@@ -6,7 +6,7 @@ require_once 'db_connect.php';
 
 // --- FUNÇÕES GLOBAIS ---
 
-// Função para log de erros
+// Função para log de erros (pode ser movida para um arquivo de helpers no futuro)
 if (!function_exists('logError')) {
     function logError($message, $type = 'ERROR') {
         $logFile = 'error.log';
@@ -31,51 +31,34 @@ if (!function_exists('loadConfigFromDB')) {
         while ($row = $stmt->fetch()) {
             $config[$row['chave']] = $row['valor'];
         }
-        
-        // Descriptografa o token da API e migra tokens legados para criptografia
-        if (!empty($config['api_token']) && strpos($config['api_token'], 'enc:v1:') !== 0) {
-            $plain = $config['api_token'];
-            $encrypted = tokenEncrypt($plain);
-            $upd = $pdo->prepare("UPDATE config SET valor = ? WHERE chave = 'api_token'");
-            $upd->execute([$encrypted]);
-            $config['api_token'] = $plain;
-        } elseif (!empty($config['api_token'])) {
-            $config['api_token'] = tokenDecrypt($config['api_token']);
-        }
-        
         return $config;
     }
 }
 
-$config = [];
-try {
-    $config = loadConfigFromDB($pdo);
+$config = loadConfigFromDB($pdo);
 
-    // Garantir que configurações padrão existam
-    $defaultConfigs = [
-        'api_token' => '',
-        'api_url' => 'https://app.pluggor.com.br/api/messages/send',
-        'notification_number' => '5500000000000',
-        'completion_message' => 'Olá {nome}! Obrigado por se cadastrar no nosso sistema. Seu currículo foi recebido com sucesso e entraremos em contato em breve.',
-        'smtp_host' => 'smtp.gmail.com',
-        'smtp_port' => '587',
-        'smtp_user' => '',
-        'smtp_pass' => '',
-        'smtp_from' => 'noreply@gorinformatica.com.br',
-        'notification_email' => 'rh@gorinformatica.com.br',
-        'system_version' => '',
-        'system_version_info' => ''
-    ];
+// Garantir que configurações padrão existam
+$defaultConfigs = [
+    'api_token' => '',
+    'api_url' => 'https://app.pluggor.com.br/api/messages/send',
+    'notification_number' => '5500000000000',
+    'completion_message' => 'Olá {nome}! Obrigado por se cadastrar no nosso sistema. Seu currículo foi recebido com sucesso e entraremos em contato em breve.',
+    'smtp_host' => 'smtp.gmail.com',
+    'smtp_port' => '587',
+    'smtp_user' => '',
+    'smtp_pass' => '',
+    'smtp_from' => 'noreply@gorinformatica.com.br',
+    'notification_email' => 'rh@gorinformatica.com.br',
+    'system_version' => '',
+    'system_version_info' => ''
+];
 
-    foreach ($defaultConfigs as $key => $value) {
-        if (!isset($config[$key])) {
-            $stmt = $pdo->prepare("INSERT INTO config (chave, valor) VALUES (?, ?)");
-            $stmt->execute([$key, $value]);
-            $config[$key] = $value;
-        }
+foreach ($defaultConfigs as $key => $value) {
+    if (!isset($config[$key])) {
+        $stmt = $pdo->prepare("INSERT INTO config (chave, valor) VALUES (?, ?)");
+        $stmt->execute([$key, $value]);
+        $config[$key] = $value;
     }
-} catch (Exception $cfgErr) {
-    logError("Erro ao carregar configurações do banco no admin.php: " . $cfgErr->getMessage(), 'ERROR');
 }
 
 // Verificar se é admin
@@ -88,7 +71,7 @@ if (!function_exists('isAdmin')) {
 // Verificar tipo de usuário
 if (!function_exists('getUserType')) {
     function getUserType() {
-        return $_SESSION['user_type'] ?? 'admin';
+        return $_SESSION['user_type'] ?? 'admin'; // padrão admin para compatibilidade
     }
 }
 
@@ -97,9 +80,9 @@ if (!function_exists('canAccessTab')) {
     function canAccessTab($tab) {
         $userType = getUserType();
         if ($userType === 'admin') {
-            return true;
+            return true; // admin acessa tudo
         } elseif ($userType === 'analisador') {
-            return $tab === 'curriculos';
+            return $tab === 'curriculos'; // analisador só acessa currículos
         }
         logError("Tentativa de acesso à aba '$tab' por usuário tipo '$userType' - acesso negado", 'WARNING');
         return false;
@@ -111,7 +94,7 @@ if (!function_exists('canAccessAction')) {
     function canAccessAction($action) {
         $userType = getUserType();
         if ($userType === 'admin' || $userType === 'analisador') {
-            return true;
+            return true; // admin e analisador podem tudo
         }
         return false;
     }
@@ -409,15 +392,7 @@ if (isAdmin()) {
         $stmt = $pdo->prepare("UPDATE config SET valor = ? WHERE chave = ?");
         foreach ($params as $param) {
             if (isset($_POST[$param])) {
-                $value = $_POST[$param];
-                if ($param === 'api_token') {
-                    // Campo mascarado (não alterado): mantém o token atual
-                    if (strpos($value, '\u{2022}') !== false || strpos($value, '•') !== false) {
-                        continue;
-                    }
-                    $value = tokenEncrypt($value);
-                }
-                $stmt->execute([$value, $param]);
+                $stmt->execute([$_POST[$param], $param]);
                 $updated++;
             }
         }
@@ -637,6 +612,7 @@ if (isAdmin()) {
         
         try {
             // Buscar último campo de cada sessão que NÃO completou o formulário
+            // Prioriza o campo registrado no evento form_abandoned (que tem o campo real)
             $stmt = $pdo->query("
                 SELECT 
                     ultimo_campo,
@@ -644,22 +620,24 @@ if (isAdmin()) {
                 FROM (
                     SELECT 
                         fi.session_id,
-                        (SELECT fi2.ultimo_campo 
-                         FROM form_interactions fi2 
-                         WHERE fi2.session_id = fi.session_id 
-                         AND fi2.ultimo_campo IS NOT NULL 
-                         AND fi2.ultimo_campo != '' 
-                         AND fi2.ultimo_campo NOT IN ('Acesso ao Formulário', 'form_access') 
-                         ORDER BY fi2.id DESC LIMIT 1) as ultimo_campo
+                        COALESCE(
+                            (SELECT fi2.ultimo_campo FROM form_interactions fi2 
+                             WHERE fi2.session_id = fi.session_id 
+                             AND fi2.acao = 'form_abandoned' 
+                             LIMIT 1),
+                            fi.ultimo_campo
+                        ) as ultimo_campo
                     FROM form_interactions fi
-                    WHERE fi.session_id NOT IN (
+                    WHERE fi.ultimo_campo IS NOT NULL
+                    AND fi.ultimo_campo != ''
+                    AND fi.ultimo_campo != 'Acesso ao Formulário'
+                    AND fi.session_id NOT IN (
                         SELECT DISTINCT session_id 
                         FROM form_interactions 
                         WHERE acao IN ('form_submitted', 'form_submit_click')
                     )
                     GROUP BY fi.session_id
                 ) as abandoned_sessions
-                WHERE ultimo_campo IS NOT NULL AND ultimo_campo != ''
                 GROUP BY ultimo_campo
                 ORDER BY count DESC
                 LIMIT 10
@@ -693,7 +671,7 @@ if (isAdmin()) {
             // Filtro de período
             switch ($period) {
                 case 'today':
-                    $where[] = "timestamp >= DATE_SUB(NOW(), INTERVAL 1 DAY)";
+                    $where[] = "DATE(timestamp) = CURDATE()";
                     break;
                 case 'week':
                     $where[] = "timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
@@ -717,16 +695,16 @@ if (isAdmin()) {
 
             $whereClause = implode(" AND ", $where);
 
-            // 1. Query principal simples e compatível com todas as versões de MySQL/MariaDB
+            // Buscar sessões agrupadas
             $stmt = $pdo->prepare("
                 SELECT 
                     session_id,
-                    MAX(ip) as ip,
-                    MAX(browser) as browser,
-                    MAX(os) as os,
-                    MAX(device) as device,
-                    MAX(nome_completo) as nome_completo,
-                    MAX(ultimo_campo) as ultimo_campo,
+                    ip,
+                    browser,
+                    os,
+                    device,
+                    nome_completo,
+                    ultimo_campo,
                     MIN(timestamp) as first_interaction,
                     MAX(timestamp) as last_interaction,
                     COUNT(*) as interaction_count
@@ -740,42 +718,27 @@ if (isAdmin()) {
             $stmt->execute($params);
             $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // 2. Enriquecimento dos dados em PHP para evitar subqueries SQL pesadas/incompatíveis
+            // Para cada sessão, verificar se foi completada
             foreach ($sessions as &$session) {
-                // Nome completo real (se nulo no agrupador)
-                if (empty($session['nome_completo'])) {
-                    $stmtName = $pdo->prepare("SELECT nome_completo FROM form_interactions WHERE session_id = ? AND nome_completo IS NOT NULL AND nome_completo != '' ORDER BY id DESC LIMIT 1");
-                    $stmtName->execute([$session['session_id']]);
-                    $session['nome_completo'] = $stmtName->fetchColumn() ?: '';
-                }
-
-                // Último campo real (excluindo rótulos genéricos de acesso)
-                $stmtField = $pdo->prepare("SELECT ultimo_campo FROM form_interactions WHERE session_id = ? AND ultimo_campo IS NOT NULL AND ultimo_campo != '' AND ultimo_campo NOT IN ('Acesso ao Formulário', 'form_access') ORDER BY id DESC LIMIT 1");
-                $stmtField->execute([$session['session_id']]);
-                $realLastField = $stmtField->fetchColumn();
-                if ($realLastField) {
-                    $session['ultimo_campo'] = $realLastField;
-                }
-
                 // 1. Verificar se existe currículo cadastrado próximo ao horário da sessão
-                $stmtCur = $pdo->prepare("
+                $stmt = $pdo->prepare("
                     SELECT id FROM curriculos 
                     WHERE ip_cadastro = ? 
                     AND ABS(TIMESTAMPDIFF(MINUTE, data_cadastro, ?)) <= 30
                     LIMIT 1
                 ");
-                $stmtCur->execute([$session['ip'], $session['last_interaction']]);
-                $hasCurriculo = $stmtCur->rowCount() > 0;
+                $stmt->execute([$session['ip'], $session['last_interaction']]);
+                $hasCurriculo = $stmt->rowCount() > 0;
 
                 // 2. Verificar se houve clique no botão de finalizar (ação 'form_submitted')
-                $stmtSub = $pdo->prepare("
+                $stmt2 = $pdo->prepare("
                     SELECT 1 FROM form_interactions 
                     WHERE session_id = ? 
                     AND acao = 'form_submitted' 
                     LIMIT 1
                 ");
-                $stmtSub->execute([$session['session_id']]);
-                $hasSubmitAction = $stmtSub->rowCount() > 0;
+                $stmt2->execute([$session['session_id']]);
+                $hasSubmitAction = $stmt2->rowCount() > 0;
 
                 $session['completed'] = $hasCurriculo || $hasSubmitAction;
             }
@@ -2218,8 +2181,7 @@ $totalCurriculos = $stmt->fetchColumn();
                         </div>
                         <div class="form-group">
                             <label>Token "Bearer"</label>
-                            <input type="text" id="apiToken" name="api_token" value="<?php echo htmlspecialchars(tokenMask($config['api_token'] ?? '')); ?>" placeholder="pg_seutoken...">
-                            <small>Por segurança, o token completo não é exibido. Para manter o token atual, deixe este campo como está.</small>
+                            <input type="text" id="apiToken" name="api_token" value="<?php echo htmlspecialchars($config['api_token']); ?>">
                         </div>
                         <div class="form-group">
                             <label>Número para Notificações</label>
