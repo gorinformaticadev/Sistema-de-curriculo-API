@@ -56,17 +56,6 @@ class Database {
             $config[$row['chave']] = $row['valor'];
         }
         
-        // Descriptografa o token da API e migra tokens legados para criptografia
-        if (!empty($config['api_token']) && strpos($config['api_token'], 'enc:v1:') !== 0) {
-            $plain = $config['api_token'];
-            $encrypted = tokenEncrypt($plain);
-            $upd = $this->pdo->prepare("UPDATE config SET valor = ? WHERE chave = 'api_token'");
-            $upd->execute([$encrypted]);
-            $config['api_token'] = $plain;
-        } elseif (!empty($config['api_token'])) {
-            $config['api_token'] = tokenDecrypt($config['api_token']);
-        }
-        
         // Configurações padrão se não existirem no banco
         $defaultConfigs = [
             'api_token' => '',
