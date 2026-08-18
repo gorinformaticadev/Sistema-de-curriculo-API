@@ -1323,9 +1323,10 @@ function sendCurriculum(formData, name, resumeFile, photoFile) {
                 console.log('📄 Conteúdo completo:', text);
             }
             
-            // 2. Tentar com trim (pode haver espaços/BOM antes ou depois)
+            // 2. Tentar com trim e remoção de BOM (pode haver caracteres invisíveis uFEFF)
             try {
-                return JSON.parse(text.trim());
+                const cleanText = text.replace(/^[\uFEFF\s]+/, '').trim();
+                return JSON.parse(cleanText);
             } catch (e) {
                 // continuar
             }
