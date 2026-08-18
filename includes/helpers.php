@@ -7,19 +7,21 @@
 /**
  * Função para log de erros no sistema
  */
-function logError($message, $type = 'ERROR') {
-    $logFile = 'error.log';
-    $maxSize = 5 * 1024 * 1024; // 5MB
+if (!function_exists('logError')) {
+    function logError($message, $type = 'ERROR') {
+        $logFile = 'error.log';
+        $maxSize = 5 * 1024 * 1024; // 5MB
 
-    if (file_exists($logFile) && filesize($logFile) > $maxSize) {
-        rename($logFile, $logFile . '.bak');
+        if (file_exists($logFile) && filesize($logFile) > $maxSize) {
+            rename($logFile, $logFile . '.bak');
+        }
+
+        $timestamp = date('Y-m-d H:i:s');
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
+        $logMessage = "[$timestamp] [$type] [IP: $ip] [UA: $userAgent] $message" . PHP_EOL;
+        file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
     }
-
-    $timestamp = date('Y-m-d H:i:s');
-    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
-    $logMessage = "[$timestamp] [$type] [IP: $ip] [UA: $userAgent] $message" . PHP_EOL;
-    file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
 }
 
 /**

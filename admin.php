@@ -6,41 +6,45 @@ require_once 'db_connect.php';
 
 // --- FUNÇÕES GLOBAIS ---
 
-// Função para log de erros (pode ser movida para um arquivo de helpers no futuro)
-function logError($message, $type = 'ERROR') {
-    $logFile = 'error.log';
-    $maxSize = 5 * 1024 * 1024; // 5MB
+// Função para log de erros
+if (!function_exists('logError')) {
+    function logError($message, $type = 'ERROR') {
+        $logFile = 'error.log';
+        $maxSize = 5 * 1024 * 1024; // 5MB
 
-    if (file_exists($logFile) && filesize($logFile) > $maxSize) {
-        rename($logFile, $logFile . '.bak');
+        if (file_exists($logFile) && filesize($logFile) > $maxSize) {
+            rename($logFile, $logFile . '.bak');
+        }
+
+        $timestamp = date('Y-m-d H:i:s');
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $logMessage = "[$timestamp] [$type] [IP: $ip] $message" . PHP_EOL;
+        file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
     }
-
-    $timestamp = date('Y-m-d H:i:s');
-    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $logMessage = "[$timestamp] [$type] [IP: $ip] $message" . PHP_EOL;
-    file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
 }
 
 // Carregar configuração do banco de dados
-function loadConfigFromDB($pdo) {
-    $config = [];
-    $stmt = $pdo->query("SELECT chave, valor FROM config");
-    while ($row = $stmt->fetch()) {
-        $config[$row['chave']] = $row['valor'];
+if (!function_exists('loadConfigFromDB')) {
+    function loadConfigFromDB($pdo) {
+        $config = [];
+        $stmt = $pdo->query("SELECT chave, valor FROM config");
+        while ($row = $stmt->fetch()) {
+            $config[$row['chave']] = $row['valor'];
+        }
+        
+        // Descriptografa o token da API e migra tokens legados para criptografia
+        if (!empty($config['api_token']) && strpos($config['api_token'], 'enc:v1:') !== 0) {
+            $plain = $config['api_token'];
+            $encrypted = tokenEncrypt($plain);
+            $upd = $pdo->prepare("UPDATE config SET valor = ? WHERE chave = 'api_token'");
+            $upd->execute([$encrypted]);
+            $config['api_token'] = $plain;
+        } elseif (!empty($config['api_token'])) {
+            $config['api_token'] = tokenDecrypt($config['api_token']);
+        }
+        
+        return $config;
     }
-    
-    // Descriptografa o token da API e migra tokens legados para criptografia
-    if (!empty($config['api_token']) && strpos($config['api_token'], 'enc:v1:') !== 0) {
-        $plain = $config['api_token'];
-        $encrypted = tokenEncrypt($plain);
-        $upd = $pdo->prepare("UPDATE config SET valor = ? WHERE chave = 'api_token'");
-        $upd->execute([$encrypted]);
-        $config['api_token'] = $plain;
-    } elseif (!empty($config['api_token'])) {
-        $config['api_token'] = tokenDecrypt($config['api_token']);
-    }
-    
-    return $config;
 }
 
 $config = [];
@@ -75,34 +79,42 @@ try {
 }
 
 // Verificar se é admin
-function isAdmin() {
-    return isset($_SESSION['admin']) && $_SESSION['admin'] === true;
+if (!function_exists('isAdmin')) {
+    function isAdmin() {
+        return isset($_SESSION['admin']) && $_SESSION['admin'] === true;
+    }
 }
 
 // Verificar tipo de usuário
-function getUserType() {
-    return $_SESSION['user_type'] ?? 'admin'; // padrão admin para compatibilidade
+if (!function_exists('getUserType')) {
+    function getUserType() {
+        return $_SESSION['user_type'] ?? 'admin';
+    }
 }
 
 // Verificar se usuário pode acessar uma aba específica
-function canAccessTab($tab) {
-    $userType = getUserType();
-    if ($userType === 'admin') {
-        return true; // admin acessa tudo
-    } elseif ($userType === 'analisador') {
-        return $tab === 'curriculos'; // analisador só acessa currículos
+if (!function_exists('canAccessTab')) {
+    function canAccessTab($tab) {
+        $userType = getUserType();
+        if ($userType === 'admin') {
+            return true;
+        } elseif ($userType === 'analisador') {
+            return $tab === 'curriculos';
+        }
+        logError("Tentativa de acesso à aba '$tab' por usuário tipo '$userType' - acesso negado", 'WARNING');
+        return false;
     }
-    logError("Tentativa de acesso à aba '$tab' por usuário tipo '$userType' - acesso negado", 'WARNING');
-    return false;
 }
 
 // Verificar se usuário pode executar uma ação específica
-function canAccessAction($action) {
-    $userType = getUserType();
-    if ($userType === 'admin' || $userType === 'analisador') {
-        return true; // admin e analisador podem tudo
+if (!function_exists('canAccessAction')) {
+    function canAccessAction($action) {
+        $userType = getUserType();
+        if ($userType === 'admin' || $userType === 'analisador') {
+            return true;
+        }
+        return false;
     }
-    return false;
 }
 
 // --- PROCESSAMENTO DE AÇÕES (POST/GET) ---
