@@ -31,7 +31,6 @@ function apiSaveApiConfig($pdo, $configData) {
                     if (strpos($value, '•') !== false) {
                         continue;
                     }
-                    $value = tokenEncrypt($value);
                 }
                 $stmt->execute([$value, $param]);
                 $updated++;
